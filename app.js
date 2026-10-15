@@ -153,6 +153,7 @@
   function swapOptions(sw, it, hist) {
     const ctx = context(state, it);
     const a = sw.a;
+    const covering = new Set(state.rows.map(r => r.sub).filter(Boolean));
     const opts = [];
     for (const b of T) {
       if (b.id === a || !presentOn(b, ctx.d) || ctx.absentSet.has(b.id)) continue;
@@ -162,7 +163,7 @@
         const bc = ctx.cell(b.id, s2);
         if (!bc || bc.swap || NON_TEACHING.has(bc.t) || bc.c !== it.c) continue;
         if (ctx.cell(a, s2) || ctx.isOut(b.id, s2)) continue;     // صاحب الطلب فاضي وقتها
-        opts.push({ b: b.id, s2, t2: bc.t, key: [hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
+        opts.push({ b: b.id, s2, t2: bc.t, covering: covering.has(b.id), key: [covering.has(b.id) ? 1 : 0, hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
       }
     }
     return opts.sort((x, y) => sortKey(x.key, y.key) || nm(x.b).localeCompare(nm(y.b), 'ar'));
@@ -213,6 +214,7 @@
     const tc = {}, extra = {};
     rows.forEach(r => { if (r !== row && r.sub) { tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
     const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOut(t.id, s) && !ctx.cell(t.id, s) && !taken.has(t.id) && !(row.refused || []).includes(t.id));
+    const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
@@ -221,7 +223,7 @@
       const over = n >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 3 ? 1 : 0;
-      return { t, h, n, same, load, run, over, key: [over ? 1 : 0, n, consec, deptTier, h, load, t.total] };
+      return { t, h, n, same, load, run, over, swp: inSwap.has(t.id), key: [over ? 1 : 0, n, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
     }).sort((a, b) => sortKey(a.key, b.key) || a.t.name.localeCompare(b.t.name, 'ar'));
   }
 
@@ -342,7 +344,7 @@
       return head + g.rows.map(({ r, i }) => {
         const cands = candidates(r, rows, hist, ctx);
         const opts = cands.map(c => {
-          const note = [c.same ? 'نفس القسم' : c.t.dept, `أمّن ${arNum(c.h)}`, `${arNum(c.load)} حصص اليوم`, c.over ? '⚠ تجاوز الحد' : '', c.run >= 3 ? `⚠ ${arNum(c.run)} متتالية` : ''].filter(Boolean).join(' · ');
+          const note = [c.same ? 'نفس القسم' : c.t.dept, `أمّن ${arNum(c.h)}`, `${arNum(c.load)} حصص اليوم`, c.over ? '⚠ تجاوز الحد' : '', c.swp ? 'عنده تبديل اليوم' : '', c.run >= 3 ? `⚠ ${arNum(c.run)} متتالية` : ''].filter(Boolean).join(' · ');
           return `<option value="${c.t.id}" ${c.t.id === r.sub ? 'selected' : ''}>${esc(c.t.name)} — ${esc(note)}</option>`;
         }).join('');
         const emg = emergencyFree(r, rows).map(id => `<option value="${esc(id)}" ${id === r.sub ? 'selected' : ''}>${esc(nm(id))}</option>`).join('');
@@ -411,7 +413,7 @@
     $('#swapList').innerHTML = state.swaps.map((sw, si) => {
       const when = sw.mode === 'from' ? `يطلع من الحصة ${SLOT_NAME[sw.from]}` : 'حصص محددة';
       const rows = sw.items.map((it, ii) => {
-        const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}</option>`).join('');
+        const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}${o.covering ? ' (عنده تأمين اليوم)' : ''}</option>`).join('');
         const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="">— للتأمين —</option>${opts}</select>`;
         const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${SLOT_NAME[it.s]}</td><td data-l="المعلم">${it.b ? '<span class="role-tag">البديل</span>' : ''}${sel}</td></tr>`;
         const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${SLOT_NAME[it.s2]}</td><td data-l="المعلم"><span class="role-tag">المستأذن</span><b>${esc(nm(sw.a))}</b></td></tr>` : '';
@@ -447,13 +449,13 @@
       const tbody = (data.swaps || []).map(sw => {
         const its = sw.items.filter(it => it.b);
         const n = its.length;
-        return its.map((it, i) => `<tr${i === 0 ? ' class="pair"' : ''}><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td>
-          ${i === 0 ? `<td class="nm" rowspan="${n}">${esc(nm(sw.a))}</td>` : ''}<td class="per-cell">${SLOT_NAME[it.s2]}</td>${i === 0 ? `<td class="sig" rowspan="${n}"></td>` : ''}
-          <td class="nm side">${esc(nm(it.b))}</td><td class="per-cell">${SLOT_NAME[it.s]}</td><td class="sig"></td></tr>`).join('');
+        return its.map((it, i) => `<tr${i === 0 ? ' class="pair"' : ''}><td>${arNum(++m)}</td>
+          ${i === 0 ? `<td class="nm" rowspan="${n}">${esc(nm(sw.a))}</td>` : ''}<td>${codeHTML(it.c)}</td><td class="per-cell">${SLOT_NAME[it.s2]}</td>${i === 0 ? `<td class="sig" rowspan="${n}"></td>` : ''}
+          <td class="nm side">${esc(nm(it.b))}</td><td>${codeHTML(it.c)}</td><td class="per-cell">${SLOT_NAME[it.s]}</td><td class="sig"></td></tr>`).join('');
       }).join('');
       body = `<table class="ps-table">
-        <thead><tr><th rowspan="2" style="width:5%">م</th><th rowspan="2" style="width:8%">الصف</th><th colspan="3" class="side-h">المعلم المستأذن</th><th colspan="3" class="side-h side">المعلم البديل</th></tr>
-        <tr><th>الاسم</th><th style="width:10%">الحصة</th><th style="width:12%">التوقيع</th><th class="side">الاسم</th><th style="width:10%">الحصة</th><th style="width:12%">التوقيع</th></tr></thead>
+        <thead><tr><th rowspan="2" style="width:5%">م</th><th colspan="4" class="side-h">المعلم المستأذن</th><th colspan="4" class="side-h side">المعلم البديل</th></tr>
+        <tr><th>الاسم</th><th style="width:7%">الصف</th><th style="width:9%">الحصة</th><th style="width:11%">التوقيع</th><th class="side">الاسم</th><th style="width:7%">الصف</th><th style="width:9%">الحصة</th><th style="width:11%">التوقيع</th></tr></thead>
         <tbody>${tbody}</tbody></table>`;
       note = '';
     }
