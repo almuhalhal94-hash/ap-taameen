@@ -16,7 +16,7 @@
 
   // ---------------- التخزين ----------------
   const defaults = () => ({
-    settings: { principal: '', assistant: '', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true },
+    settings: { principal: '', assistant: '', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم' },
     avail: {},     // tid -> {released, days}
     history: {}    // 'YYYY-MM-DD' -> {absent:{tid:[slots]}, rows:[], swaps:[], savedAt}
   });
@@ -53,7 +53,9 @@
   };
   const weekdayName = iso => new Intl.DateTimeFormat('ar', { weekday: 'long' }).format(parseISO(iso));
   const sortKey = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };
-  const nm = id => byId[id] ? byId[id].name : id;
+  const isE = id => typeof id === 'string' && id.startsWith('E:');
+  const nm = id => isE(id) ? id.slice(2) : byId[id] ? byId[id].name : id;
+  const emergencyList = () => (db.settings.emergency || '').split('\n').map(x => x.trim()).filter(Boolean);
 
   let toastTimer;
   function toast(msg) {
@@ -130,17 +132,20 @@
 
   // ---------------- العدّ من السجل ----------------
   function historyCounts(excludeDate) {
-    const cnt = {}, abs = {}, last = {}, swA = {}, swB = {};
+    const cnt = {}, abs = {}, last = {}, swA = {}, swB = {}, ref = {};
+    let emg = 0;
     for (const [iso, h] of Object.entries(db.history)) {
       if (iso === excludeDate) continue;
-      for (const r of h.rows || []) if (r.sub) { cnt[r.sub] = (cnt[r.sub] || 0) + 1; if (!last[r.sub] || iso > last[r.sub]) last[r.sub] = iso; }
+      for (const r of h.rows || []) (r.refused || []).forEach(x => { ref[x] = (ref[x] || 0) + 1; });
+      for (const r of h.rows || []) if (r.sub && isE(r.sub)) emg++;
+      for (const r of h.rows || []) if (r.sub && !isE(r.sub)) { cnt[r.sub] = (cnt[r.sub] || 0) + 1; if (!last[r.sub] || iso > last[r.sub]) last[r.sub] = iso; }
       for (const tid of Object.keys(h.absent || {})) abs[tid] = (abs[tid] || 0) + 1;
       for (const sw of h.swaps || []) {
         swA[sw.a] = (swA[sw.a] || 0) + 1;
         for (const it of sw.items) if (it.b) swB[it.b] = (swB[it.b] || 0) + 1;
       }
     }
-    return { cnt, abs, last, swA, swB };
+    return { cnt, abs, last, swA, swB, ref, emg };
   }
 
   // ---------------- التبديل ----------------
@@ -207,7 +212,7 @@
     const taken = new Set(rows.filter(r => r !== row && r.slot === s && r.sub).map(r => r.sub));
     const tc = {}, extra = {};
     rows.forEach(r => { if (r !== row && r.sub) { tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
-    const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOut(t.id, s) && !ctx.cell(t.id, s) && !taken.has(t.id));
+    const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOut(t.id, s) && !ctx.cell(t.id, s) && !taken.has(t.id) && !(row.refused || []).includes(t.id));
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
@@ -220,6 +225,16 @@
     }).sort((a, b) => sortKey(a.key, b.key) || a.t.name.localeCompare(b.t.name, 'ar'));
   }
 
+  function emergencyFree(row, rows) {
+    const taken = new Set(rows.filter(r => r !== row && r.slot === row.slot && r.sub).map(r => r.sub));
+    return emergencyList().map(n => 'E:' + n).filter(id => !taken.has(id));
+  }
+  // يختار للحصة الأنسب، وإذا ما فيه أحد يروح للطوارئ
+  function assignOne(r, rows, hist, ctx) {
+    const best = candidates(r, rows, hist, ctx).find(c => !c.over);
+    r.sub = best ? best.t.id : (emergencyFree(r, rows)[0] || '');
+  }
+
   // يعيد بناء جدول التأمين: يحافظ على الاختيارات اليدوية الصالحة ويوزّع الباقي
   function recompute(resetManual = false) {
     if (D() === -1) return;
@@ -229,18 +244,17 @@
     const prev = new Map(state.rows.map(r => [`${r.absent}|${r.slot}`, r]));
     const rows = needs(ctx).map(n => {
       const old = prev.get(`${n.absent}|${n.slot}`);
-      return { ...n, sub: !resetManual && old && old.m ? old.sub : '', m: !resetManual && old ? !!old.m : false };
+      return { ...n, sub: !resetManual && old && old.m ? old.sub : '', m: !resetManual && old ? !!old.m : false, refused: old && old.refused ? old.refused : [] };
     });
     // تحقق من صلاحية اليدوي
-    rows.filter(r => r.m).forEach(r => { if (r.sub && !candidates(r, rows, hist, ctx).some(c => c.t.id === r.sub)) { r.sub = ''; r.m = false; } });
+    rows.filter(r => r.m).forEach(r => { if (r.sub && !(isE(r.sub) ? emergencyFree(r, rows).includes(r.sub) : candidates(r, rows, hist, ctx).some(c => c.t.id === r.sub))) { r.sub = ''; r.m = false; } });
     const pending = rows.filter(r => !r.m);
     pending.forEach(r => { r.sub = ''; });
     while (pending.length) {
       pending.forEach(r => { r._n = candidates(r, rows, hist, ctx).filter(c => !c.over).length; });
       pending.sort((a, b) => a._n - b._n || slotIdx(a.slot) - slotIdx(b.slot));
       const r = pending.shift();
-      const best = candidates(r, rows, hist, ctx).find(c => !c.over);
-      r.sub = best ? best.t.id : '';
+      assignOne(r, rows, hist, ctx);
     }
     rows.forEach(r => delete r._n);
     state.rows = rows;
@@ -331,13 +345,16 @@
           const note = [c.same ? 'نفس القسم' : c.t.dept, `أمّن ${arNum(c.h)}`, `${arNum(c.load)} حصص اليوم`, c.over ? '⚠ تجاوز الحد' : '', c.run >= 3 ? `⚠ ${arNum(c.run)} متتالية` : ''].filter(Boolean).join(' · ');
           return `<option value="${c.t.id}" ${c.t.id === r.sub ? 'selected' : ''}>${esc(c.t.name)} — ${esc(note)}</option>`;
         }).join('');
+        const emg = emergencyFree(r, rows).map(id => `<option value="${esc(id)}" ${id === r.sub ? 'selected' : ''}>${esc(nm(id))}</option>`).join('');
         const cur = cands.find(c => c.t.id === r.sub);
-        const badge = !r.sub ? '<span class="badge none">بدون مؤمِّن</span>' : cur && cur.same ? '<span class="badge dept">من القسم</span>' : '<span class="badge other">من قسم آخر</span>';
+        const badge = !r.sub ? '<span class="badge none">بدون مؤمِّن</span>' : isE(r.sub) ? '<span class="badge emg">طوارئ</span>' : cur && cur.same ? '<span class="badge dept">من القسم</span>' : '<span class="badge other">من قسم آخر</span>';
+        const refusedTxt = (r.refused || []).length ? ` <small class="muted">اعتذر: ${esc(r.refused.map(nm).join('، '))}</small>` : '';
+        const refuseBtn = r.sub && !isE(r.sub) ? ` <button class="link" data-refuse="${i}">اعتذر</button>` : '';
         return `<tr class="${r.sub ? '' : 'missing'}">
           <td class="per" data-l="الحصة">${SLOT_NAME[r.slot]}</td>
           <td data-l="الصف">${codeHTML(r.c)}</td>
           <td data-l="المادة">${esc(r.t)}</td>
-          <td data-l="المؤمِّن"><select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option>${opts}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}</span></td>
+          <td data-l="المؤمِّن"><select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="طوارئ">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
         </tr>`;
       }).join('');
     }).join('');
@@ -429,15 +446,14 @@
       let m = 0;
       const tbody = (data.swaps || []).map(sw => {
         const its = sw.items.filter(it => it.b);
-        if (!its.length) return '';
         const n = its.length;
-        const who = `${esc(nm(sw.a))}${its.map(it => `<br><small>الحصة ${SLOT_NAME[it.s2]}</small>`).join('')}`;
         return its.map((it, i) => `<tr${i === 0 ? ' class="pair"' : ''}><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td>
-          ${i === 0 ? `<td class="nm" rowspan="${n}">${who}</td><td class="sig" rowspan="${n}"></td>` : ''}
-          <td class="nm">${esc(nm(it.b))}<br><small>الحصة ${SLOT_NAME[it.s]}</small></td><td class="sig"></td></tr>`).join('');
+          ${i === 0 ? `<td class="nm" rowspan="${n}">${esc(nm(sw.a))}</td>` : ''}<td class="per-cell">${SLOT_NAME[it.s2]}</td>${i === 0 ? `<td class="sig" rowspan="${n}"></td>` : ''}
+          <td class="nm side">${esc(nm(it.b))}</td><td class="per-cell">${SLOT_NAME[it.s]}</td><td class="sig"></td></tr>`).join('');
       }).join('');
       body = `<table class="ps-table">
-        <thead><tr><th style="width:5%">م</th><th style="width:9%">الصف</th><th>المعلم المستأذن</th><th style="width:16%">التوقيع</th><th>المعلم البديل</th><th style="width:16%">التوقيع</th></tr></thead>
+        <thead><tr><th rowspan="2" style="width:5%">م</th><th rowspan="2" style="width:8%">الصف</th><th colspan="3" class="side-h">المعلم المستأذن</th><th colspan="3" class="side-h side">المعلم البديل</th></tr>
+        <tr><th>الاسم</th><th style="width:10%">الحصة</th><th style="width:12%">التوقيع</th><th class="side">الاسم</th><th style="width:10%">الحصة</th><th style="width:12%">التوقيع</th></tr></thead>
         <tbody>${tbody}</tbody></table>`;
       note = '';
     }
@@ -515,7 +531,7 @@
 
   // ---------------- الإحصائيات ----------------
   function renderStats() {
-    const { cnt, abs, last, swA, swB } = historyCounts(null);
+    const { cnt, abs, last, swA, swB, ref, emg } = historyCounts(null);
     const total = Object.values(cnt).reduce((a, b) => a + b, 0);
     const days = Object.keys(db.history).length;
     const covered = Object.keys(cnt).length;
@@ -526,19 +542,19 @@
       <div class="kpi"><span>إجمالي حصص التأمين</span><b>${arNum(total)}</b><small>خلال ${arNum(days)} يوم مسجّل</small></div>
       <div class="kpi"><span>معلمون أمّنوا</span><b>${arNum(covered)}</b><small>المتوسط ${covered ? arNum(+(total / covered).toFixed(1)) : '٠'} حصة لكل معلم</small></div>
       <div class="kpi"><span>حصص تبدّلت</span><b>${arNum(swaps)}</b><small>بين المعلمين بدل التأمين</small></div>
-      <div class="kpi"><span>الأكثر تأمينًا</span><b class="kpi-name">${topId ? esc(nm(topId)) : '—'}</b><small>${topId ? arNum(cnt[topId]) + ' حصة' : ''}${missing ? ` · ${arNum(missing)} حصة بلا مؤمِّن` : ''}</small></div>`;
+      <div class="kpi"><span>الأكثر تأمينًا</span><b class="kpi-name">${topId ? esc(nm(topId)) : '—'}</b><small>${topId ? arNum(cnt[topId]) + ' حصة' : ''}${missing ? ` · ${arNum(missing)} حصة بلا مؤمِّن` : ''}${emg ? ` · ${arNum(emg)} بالطوارئ` : ''}</small></div>`;
     const sort = $('#statsSort').value;
     const list = T.filter(t => !availOf(t).released || cnt[t.id]);
     list.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ar')
       : sort === 'dept' ? deptOrder.indexOf(a.dept) - deptOrder.indexOf(b.dept) || (cnt[b.id] || 0) - (cnt[a.id] || 0)
       : (cnt[b.id] || 0) - (cnt[a.id] || 0) || a.name.localeCompare(b.name, 'ar'));
     const max = Math.max(1, ...Object.values(cnt));
-    $('#statsTable').innerHTML = `<thead><tr><th>المعلم</th><th>القسم</th><th>مرات التأمين</th><th>النسبة</th><th></th><th>النصاب الأسبوعي</th><th>العبء</th><th>الغياب</th><th>تبديل لزميل</th><th>طلب تبديل</th><th>آخر تأمين</th></tr></thead><tbody>${list.map(t => {
+    $('#statsTable').innerHTML = `<thead><tr><th>المعلم</th><th>القسم</th><th>مرات التأمين</th><th>النسبة</th><th></th><th>النصاب الأسبوعي</th><th>العبء</th><th>الغياب</th><th>اعتذار</th><th>تبديل لزميل</th><th>طلب تبديل</th><th>آخر تأمين</th></tr></thead><tbody>${list.map(t => {
       const n = cnt[t.id] || 0, pct = total ? n / total * 100 : 0;
       return `<tr><td><b>${esc(t.name)}</b></td><td class="muted">${esc(t.dept)}</td><td class="num">${arNum(n)}</td><td class="num">${arNum(pct.toFixed(1))}٪</td>
         <td><div class="bar"><i style="width:${n / max * 100}%"></i></div></td><td class="num">${arNum(t.teaching)}</td>
         <td class="num">${t.teaching ? arNum((n / t.teaching * 100).toFixed(0)) + '٪' : '—'}</td><td class="num">${arNum(abs[t.id] || 0)}</td>
-        <td class="num">${arNum(swB[t.id] || 0)}</td><td class="num">${arNum(swA[t.id] || 0)}</td><td class="muted">${last[t.id] ? gHTML(last[t.id]) : '—'}</td></tr>`;
+        <td class="num">${arNum(ref[t.id] || 0)}</td><td class="num">${arNum(swB[t.id] || 0)}</td><td class="num">${arNum(swA[t.id] || 0)}</td><td class="muted">${last[t.id] ? gHTML(last[t.id]) : '—'}</td></tr>`;
     }).join('')}</tbody>`;
     const hs = Object.keys(db.history).sort().reverse();
     $('#historyList').innerHTML = hs.length ? hs.map(iso => {
@@ -578,6 +594,7 @@
     $('#setPrincipal').value = s.principal; $('#setAssistant').value = s.assistant;
     $('#setMax').value = String(s.maxPerDay); $('#setDept').checked = s.deptFirst;
     $('#setBreak').checked = s.coverBreak; $('#setConsec').checked = s.avoidConsec;
+    $('#setEmg').value = s.emergency || '';
     $('#sourceNote').textContent = `مصدر الجدول: ${window.TIMETABLE.source} — ${T.length} معلمًا`;
   }
 
@@ -621,6 +638,15 @@
   });
 
   $('#btnRedistribute').addEventListener('click', () => { recompute(true); renderAll(); toast('تمت إعادة التوزيع'); });
+  $('#resTable').addEventListener('click', e => {
+    const b = e.target.closest('[data-refuse]'); if (!b) return;
+    const r = state.rows[+b.dataset.refuse];
+    r.refused = [...(r.refused || []), r.sub];
+    r.m = false;
+    assignOne(r, state.rows, historyCounts(date), context());
+    commit(); renderResults();
+    toast(isE(r.sub) ? `ما فيه معلم متاح — انتقلت للطوارئ: ${nm(r.sub)}` : r.sub ? `تم التحويل إلى ${nm(r.sub)}` : 'ما فيه أحد متاح لهالحصة');
+  });
   $('#resTable').addEventListener('change', e => {
     const sel = e.target.closest('select[data-row]'); if (!sel) return;
     const r = state.rows[+sel.dataset.row];
@@ -705,6 +731,7 @@
   bindSetting('#setDept', 'deptFirst', el => el.checked);
   bindSetting('#setBreak', 'coverBreak', el => el.checked);
   bindSetting('#setConsec', 'avoidConsec', el => el.checked);
+  bindSetting('#setEmg', 'emergency', el => el.value);
 
   $('#btnExport').addEventListener('click', () => saveFile(`تأمين-نسخة-${isoOf(new Date())}.json`, new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' }), `taameen-backup-${isoOf(new Date())}.json`));
   $('#fileImport').addEventListener('change', async e => {
