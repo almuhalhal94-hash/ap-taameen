@@ -396,8 +396,8 @@
       const rows = sw.items.map((it, ii) => {
         const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}</option>`).join('');
         const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="">— للتأمين —</option>${opts}</select>`;
-        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${SLOT_NAME[it.s]}</td><td data-l="المعلم">${sel}</td></tr>`;
-        const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${SLOT_NAME[it.s2]}</td><td data-l="المعلم"><b>${esc(nm(sw.a))}</b></td></tr>` : '';
+        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${SLOT_NAME[it.s]}</td><td data-l="المعلم">${it.b ? '<span class="role-tag">البديل</span>' : ''}${sel}</td></tr>`;
+        const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${SLOT_NAME[it.s2]}</td><td data-l="المعلم"><span class="role-tag">المستأذن</span><b>${esc(nm(sw.a))}</b></td></tr>` : '';
         return first + second;
       }).join('');
       return `<div class="card"><div class="card-head"><h2>${esc(nm(sw.a))}</h2><button class="btn danger" data-swdel="${si}">إلغاء الطلب</button></div>
@@ -427,13 +427,12 @@
       note = 'نأمل من المعلمين الأفاضل التوقيع بالعلم، والتواجد في الصف بداية الحصة. شاكرين تعاونكم.';
     } else {
       let m = 0;
-      const tbody = (data.swaps || []).flatMap(sw => sw.items.filter(it => it.b).map(it => {
-        const [p1, p2] = slotIdx(it.s2) < slotIdx(it.s) ? [[it.s2, sw.a], [it.s, it.b]] : [[it.s, it.b], [it.s2, sw.a]];
-        return `<tr class="pair"><td rowspan="2">${arNum(++m)}</td><td rowspan="2">${codeHTML(it.c)}</td><td>${SLOT_NAME[p1[0]]}</td><td class="nm">${esc(nm(p1[1]))}</td><td class="sig"></td></tr>
-          <tr><td>${SLOT_NAME[p2[0]]}</td><td class="nm">${esc(nm(p2[1]))}</td><td class="sig"></td></tr>`;
-      })).join('');
+      const tbody = (data.swaps || []).flatMap(sw => sw.items.filter(it => it.b).map(it =>
+        `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td>
+          <td class="nm">${esc(nm(sw.a))}<br><small>الحصة ${SLOT_NAME[it.s2]}</small></td><td class="sig"></td>
+          <td class="nm">${esc(nm(it.b))}<br><small>الحصة ${SLOT_NAME[it.s]}</small></td><td class="sig"></td></tr>`)).join('');
       body = `<table class="ps-table">
-        <thead><tr><th style="width:6%">م</th><th style="width:10%">الصف</th><th style="width:14%">الحصة</th><th>المعلم</th><th style="width:26%">التوقيع</th></tr></thead>
+        <thead><tr><th style="width:5%">م</th><th style="width:9%">الصف</th><th>المعلم المستأذن</th><th style="width:16%">التوقيع</th><th>المعلم البديل</th><th style="width:16%">التوقيع</th></tr></thead>
         <tbody>${tbody}</tbody></table>`;
       note = '';
     }
