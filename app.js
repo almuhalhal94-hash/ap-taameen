@@ -28,9 +28,13 @@
       db = { ...db, ...p, settings: { ...db.settings, ...(p.settings || {}) } };
       // دمج المسودات من النسخة السابقة
       if (p.drafts) { Object.assign(db.history, p.drafts); delete db.drafts; }
+      // نسخة التسليم: يمسح سجل التجارب مرة وحدة ويبقي الإعدادات
+      if (!p.clean1) { db.history = {}; db.needSave = true; }
     }
+    db.clean1 = true;
   } catch (e) { /* يبدأ فاضي */ }
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify(db)); } catch (e) { toast('تعذّر الحفظ في المتصفح'); } };
+  if (db.needSave) { delete db.needSave; persist(); }
 
   const availOf = t => db.avail[t.id] || { released: t.teaching === 0, days: t.days.slice() };
   const presentOn = (t, d) => { const a = availOf(t); return !a.released && a.days.includes(d); };
