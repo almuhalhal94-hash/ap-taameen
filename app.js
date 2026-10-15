@@ -90,6 +90,73 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
+  // ---------------- التخزين السحابي ----------------
+  // السجل والإعدادات تنحفظ في قاعدة بيانات البرنامج (لما يكون مفتوح داخل Claude)،
+  // ونسخة منها في المتصفح احتياط.
+  let cloud = null, cloudWarned = false;
+  const writing = new Map(), pendingW = new Map();
+  function cloudWrite(path, body) {
+    if (!cloud) return;
+    if (writing.has(path)) { pendingW.set(path, body); return; }
+    const run = async b => {
+      writing.set(path, true);
+      try { b === null ? await cloud.doc(path).delete() : await cloud.doc(path).set(b); }
+      catch (e) {
+        if (!cloudWarned) { cloudWarned = true; toast(e && e.code === 'invalid_argument' ? 'ما عندك صلاحية الحفظ — اطلب صلاحية «محرر» من صاحب البرنامج' : 'تعذّر الحفظ في السحابة، محفوظ في هذا الجهاز'); }
+      }
+      writing.delete(path);
+      if (pendingW.has(path)) { const nb = pendingW.get(path); pendingW.delete(path); run(nb); }
+    };
+    run(body);
+  }
+  const cloudDay = iso => cloudWrite(`days/${iso}`, db.history[iso] ? JSON.parse(JSON.stringify(db.history[iso])) : null);
+  const cloudConfig = () => cloudWrite('config/main', { settings: { ...db.settings }, avail: JSON.parse(JSON.stringify(db.avail)) });
+  function setStorageNote() {
+    const el = $('#storageNote'); if (!el) return;
+    el.textContent = cloud ? '☁︎ السجل محفوظ في السحابة، ويطلع نفسه من أي جهاز.' : 'السجل محفوظ في هذا المتصفح فقط — خذ نسخة احتياطية بين فترة وفترة.';
+  }
+  async function startCloud() {
+    if (!claudeHost) { setStorageNote(); return; }
+    let c = null;
+    try { c = await window.claude.use('db'); } catch (e) { c = null; }
+    if (!c) { setStorageNote(); return; }
+    try {
+      const [cfg, days] = await Promise.all([c.doc('config/main').get(), c.collection('days').limit(1000).get()]);
+      cloud = c;
+      if (!cfg.exists && days.empty) {
+        // أول تشغيل: ارفع اللي في المتصفح
+        cloudConfig();
+        Object.keys(db.history).forEach(cloudDay);
+      } else {
+        if (cfg.exists) {
+          const v = cfg.data();
+          db.settings = { ...defaults().settings, ...(v.settings || {}) };
+          db.avail = JSON.parse(JSON.stringify(v.avail || {}));
+        }
+        db.history = {};
+        days.docs.forEach(d => { if (d.exists) db.history[d.id] = JSON.parse(JSON.stringify(d.data())); });
+        persist();
+        renderSettings(); loadDate(date);
+        if (document.querySelector('.tab.active')?.dataset.tab === 'stats') renderStats();
+      }
+      // تحديث مباشر لو أحد ثاني عدّل من جهاز ثاني
+      c.collection('days').limit(1000).onSnapshot(snap => {
+        let touched = false;
+        snap.docChanges().forEach(ch => {
+          if (ch.doc.metadata.hasPendingWrites || writing.has(`days/${ch.doc.id}`)) return;
+          const iso = ch.doc.id;
+          const val = ch.type === 'removed' ? null : JSON.parse(JSON.stringify(ch.doc.data()));
+          if (JSON.stringify(val) === JSON.stringify(db.history[iso] || null)) return;
+          if (val) db.history[iso] = val; else delete db.history[iso];
+          touched = true;
+          if (iso === date) loadDate(date);
+        });
+        if (touched) { persist(); if (document.querySelector('.tab.active')?.dataset.tab === 'stats') renderStats(); }
+      }, () => {});
+    } catch (e) { cloud = null; }
+    setStorageNote();
+  }
+
   // ---------------- حالة اليوم ----------------
   let date = isoOf(new Date());
   let state = emptyDay();
@@ -107,7 +174,7 @@
     const has = Object.keys(state.absent).length || state.swaps.length;
     if (has) db.history[date] = { ...JSON.parse(JSON.stringify(state)), savedAt: new Date().toISOString() };
     else delete db.history[date];
-    persist();
+    persist(); cloudDay(date);
     $('#savedFlag').hidden = !has;
   }
 
@@ -709,7 +776,7 @@
     if (p) pdfDay(p.dataset.hpdf, db.history[p.dataset.hpdf], p);
     if (ps) pdfDay(ps.dataset.hspdf, db.history[ps.dataset.hspdf], ps, 'swap');
     if (d && await ask(`حذف يوم ${fmtG(d.dataset.del)} من السجل؟`, 'حذف')) {
-      delete db.history[d.dataset.del]; persist();
+      delete db.history[d.dataset.del]; persist(); cloudDay(d.dataset.del);
       if (d.dataset.del === date) state = emptyDay();
       renderStats();
     }
@@ -721,16 +788,16 @@
     if (dt) {
       const t = byId[dt.dataset.tday], a = { ...availOf(t) }, d = +dt.dataset.d;
       a.days = a.days.includes(d) ? a.days.filter(x => x !== d) : [...a.days, d].sort();
-      db.avail[t.id] = a; persist();
+      db.avail[t.id] = a; persist(); cloudConfig();
     } else if (rel) {
       const t = byId[rel.dataset.rel], a = { ...availOf(t) };
-      a.released = !a.released; db.avail[t.id] = a; persist();
+      a.released = !a.released; db.avail[t.id] = a; persist(); cloudConfig();
     } else if (tt) { openTT.has(tt.dataset.tt) ? openTT.delete(tt.dataset.tt) : openTT.add(tt.dataset.tt); }
     else return;
     renderTeachers();
   });
 
-  const bindSetting = (sel, key, fn) => $(sel).addEventListener('change', e => { db.settings[key] = fn(e.target); persist(); });
+  const bindSetting = (sel, key, fn) => $(sel).addEventListener('change', e => { db.settings[key] = fn(e.target); persist(); cloudConfig(); });
   bindSetting('#setPrincipal', 'principal', el => el.value.trim());
   bindSetting('#setAssistant', 'assistant', el => el.value.trim());
   bindSetting('#setMax', 'maxPerDay', el => +el.value);
@@ -749,17 +816,20 @@
       if (!(await ask('استرجاع النسخة سيستبدل البيانات الحالية. متأكد؟', 'استرجاع'))) return;
       db = { ...defaults(), ...data, settings: { ...defaults().settings, ...data.settings } };
       if (data.drafts) { Object.assign(db.history, data.drafts); delete db.drafts; }
-      persist(); renderSettings(); loadDate(date); toast('تم الاسترجاع');
+      const old = Object.keys(JSON.parse(localStorage.getItem(STORE) || '{}').history || {});
+      persist(); cloudConfig(); old.forEach(iso => { if (!db.history[iso]) cloudWrite(`days/${iso}`, null); }); Object.keys(db.history).forEach(cloudDay);
+      renderSettings(); loadDate(date); toast('تم الاسترجاع');
     } catch (err) { toast('الملف غير صالح'); }
   });
   $('#btnReset').addEventListener('click', async () => {
     if (!(await ask('مسح كل سجل التأمين والإحصائيات؟ (الإعدادات تبقى)', 'مسح'))) return;
-    db.history = {}; persist(); loadDate(date); toast('تم مسح السجل');
+    const gone = Object.keys(db.history); db.history = {}; persist(); gone.forEach(iso => cloudWrite(`days/${iso}`, null)); loadDate(date); toast('تم مسح السجل');
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) $('#modalNo').click(); });
 
   // ---------------- البداية ----------------
   renderHeroDate();
+  startCloud();
   renderSettings();
   const start = new Date();
   while (start.getDay() > 4) start.setDate(start.getDate() + 1);
