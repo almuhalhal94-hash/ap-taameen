@@ -389,6 +389,7 @@
   }
 
   function renderSwaps() {
+    $('#swapBar').hidden = !state.swaps.length;
     const hist = historyCounts(date);
     $('#swapList').innerHTML = state.swaps.map((sw, si) => {
       const fromTxt = sw.mode === 'from' ? `يخرج من الحصة ${SLOT_NAME[sw.from]}` : `حصص محددة`;
@@ -405,57 +406,72 @@
   }
 
   // ---------------- كشف الطباعة / PDF ----------------
-  function buildSheet(iso, data) {
+  const SHEETS = {
+    cover: { title: 'كشف تأمين الحصص', file: 'كشف-التأمين', plain: 'taameen', empty: 'ما فيه حصص تأمين لهذا اليوم' },
+    swap: { title: 'كشف تبديل الحصص', file: 'كشف-التبديل', plain: 'tabdeel', empty: 'ما فيه تبديلات لهذا اليوم' }
+  };
+  const hasContent = (data, kind) => kind === 'swap' ? (data.swaps || []).some(sw => sw.items.length) : (data.rows || []).length > 0;
+
+  function buildSheet(iso, data, kind) {
     const s = db.settings;
-    const groups = groupRows(data.rows || []);
-    let n = 0;
-    const tbody = groups.map(g => `<tr class="ps-grp"><td colspan="6">${g.kind === 'out' ? 'المعلم المستأذن' : 'المعلم الغائب'}: <b>${esc(nm(g.absent))}</b> — ${esc(byId[g.absent].dept)}</td></tr>` +
-      g.rows.map(({ r }) => `<tr><td>${arNum(++n)}</td><td>${SLOT_NAME[r.slot]}</td><td>${r.c ? codeHTML(r.c) : '—'}</td><td>${esc(r.t)}</td>
-        <td class="nm">${r.sub ? esc(nm(r.sub)) : '................................'}</td><td class="sig"></td></tr>`).join('')).join('');
-    const swaps = (data.swaps || []).filter(sw => sw.items.some(it => it.b));
-    let m = 0;
-    const swBody = swaps.map(sw => `<tr class="ps-grp"><td colspan="7">صاحب الطلب: <b>${esc(nm(sw.a))}</b>${sw.reason ? ` — ${esc(sw.reason)}` : ''}</td></tr>` +
-      sw.items.filter(it => it.b).map(it => `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}<br><small>${esc(it.t)}</small></td>
-        <td class="nm">${esc(nm(it.b))}</td><td>${SLOT_NAME[it.s2]}<br><small>${esc(it.t2)}</small></td><td class="sig"></td><td class="sig"></td></tr>`).join('')).join('');
+    let body = '', note = '';
+    if (kind === 'cover') {
+      let n = 0;
+      const tbody = groupRows(data.rows || []).map(g => `<tr class="ps-grp"><td colspan="6">${g.kind === 'out' ? 'المعلم المستأذن' : 'المعلم الغائب'}: <b>${esc(nm(g.absent))}</b> — ${esc(byId[g.absent].dept)}</td></tr>` +
+        g.rows.map(({ r }) => `<tr><td>${arNum(++n)}</td><td>${SLOT_NAME[r.slot]}</td><td>${r.c ? codeHTML(r.c) : '—'}</td><td>${esc(r.t)}</td>
+          <td class="nm">${r.sub ? esc(nm(r.sub)) : '................................'}</td><td class="sig"></td></tr>`).join('')).join('');
+      body = `<table class="ps-table">
+        <thead><tr><th style="width:6%">م</th><th style="width:11%">الحصة</th><th style="width:10%">الصف</th><th style="width:15%">المادة</th><th>المعلم المؤمِّن</th><th style="width:26%">التوقيع بالعلم</th></tr></thead>
+        <tbody>${tbody}</tbody></table>`;
+      note = 'نأمل من المعلمين الأفاضل التوقيع بالعلم، والتواجد في الصف بداية الحصة. شاكرين تعاونكم.';
+    } else {
+      let m = 0;
+      const tbody = (data.swaps || []).filter(sw => sw.items.length).map(sw => {
+        const when = sw.mode === 'from' ? `يخرج من بداية الحصة ${SLOT_NAME[sw.from]}` : `حصص محددة`;
+        return `<tr class="ps-grp"><td colspan="6">صاحب الطلب: <b>${esc(nm(sw.a))}</b> — ${when}${sw.reason ? ` — السبب: ${esc(sw.reason)}` : ''}</td></tr>` +
+          sw.items.map(it => it.b
+            ? `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}<br><small>${esc(it.t)}</small></td>
+                <td class="nm">${esc(nm(it.b))}<br><small>يدخل الحصة ${SLOT_NAME[it.s]}</small></td><td>${SLOT_NAME[it.s2]}<br><small>يدخلها ${esc(nm(sw.a))}</small></td><td class="sig"></td></tr>`
+            : `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}<br><small>${esc(it.t)}</small></td><td colspan="3" class="muted-cell">ما فيه تبديل — الحصة محوّلة لكشف التأمين</td></tr>`).join('') +
+          `<tr class="ps-sigrow"><td colspan="3">توقيع صاحب الطلب: <b>${esc(nm(sw.a))}</b></td><td colspan="3" class="sig"></td></tr>`;
+      }).join('');
+      body = `<table class="ps-table">
+        <thead><tr><th style="width:6%">م</th><th style="width:9%">الصف</th><th style="width:15%">حصة صاحب الطلب</th><th>المعلم البديل</th><th style="width:20%">الحصة المقابلة</th><th style="width:22%">توقيع البديل بالعلم</th></tr></thead>
+        <tbody>${tbody}</tbody></table>`;
+      note = 'تم تبديل الحصص أعلاه بموافقة الطرفين، ويلتزم كل معلم بالحصة المقابلة في موعدها. شاكرين تعاونكم.';
+    }
     $('#printSheet').innerHTML = `
       <div class="ps-head"><img src="assets/header.jpg" alt=""></div>
-      <h1 class="ps-title">كشف تأمين الحصص</h1>
+      <h1 class="ps-title">${SHEETS[kind].title}</h1>
       <div class="ps-meta"><span>اليوم: <b>${esc(weekdayName(iso))}</b></span><span>التاريخ: <b>${gHTML(iso)}</b></span><span>الموافق: <b>${esc(fmtH(iso))}</b></span></div>
-      ${groups.length ? `<table class="ps-table">
-        <thead><tr><th style="width:6%">م</th><th style="width:11%">الحصة</th><th style="width:10%">الصف</th><th style="width:15%">المادة</th><th>المعلم المؤمِّن</th><th style="width:26%">التوقيع بالعلم</th></tr></thead>
-        <tbody>${tbody}</tbody></table>` : ''}
-      ${swBody ? `<h2 class="ps-sub">تبديل الحصص</h2><table class="ps-table">
-        <thead><tr><th style="width:6%">م</th><th style="width:9%">الصف</th><th style="width:13%">حصة صاحب الطلب</th><th>المعلم البديل</th><th style="width:13%">الحصة المقابلة</th><th style="width:15%">توقيع صاحب الطلب</th><th style="width:15%">توقيع البديل</th></tr></thead>
-        <tbody>${swBody}</tbody></table>` : ''}
-      <p class="ps-note">نأمل من المعلمين الأفاضل التوقيع بالعلم، والتواجد في الصف بداية الحصة. شاكرين تعاونكم.</p>
+      ${body}
+      <p class="ps-note">${note}</p>
       <div class="ps-foot">
         <div><div class="role">المدير المساعد</div><div class="pname">${esc(s.assistant)}</div><div class="sigline">التوقيع</div></div>
         <div><div class="role">مدير المدرسة</div><div class="pname">${esc(s.principal)}</div><div class="sigline">التوقيع</div></div>
       </div>`;
-    return groups.length || swBody;
   }
-  const hasContent = data => (data.rows || []).length || (data.swaps || []).some(sw => sw.items.some(it => it.b));
 
-  function printDay(iso, data) {
-    if (!hasContent(data)) { toast('ما فيه شي للطباعة'); return; }
-    buildSheet(iso, data);
+  function printDay(iso, data, kind = 'cover') {
+    if (!hasContent(data, kind)) { toast(SHEETS[kind].empty); return; }
+    buildSheet(iso, data, kind);
     const old = document.title;
-    document.title = `كشف تأمين ${weekdayName(iso)} ${fmtG(iso)}`;
+    document.title = `${SHEETS[kind].title} ${weekdayName(iso)} ${fmtG(iso)}`;
     const img = $('#printSheet img');
     const go = () => { window.print(); document.title = old; };
     if (img.complete) go(); else img.onload = img.onerror = go;
   }
 
   let pdfBusy = false;
-  async function pdfDay(iso, data, btn) {
-    if (!hasContent(data)) { toast('ما فيه شي في الكشف'); return; }
+  async function pdfDay(iso, data, btn, kind = 'cover') {
+    if (!hasContent(data, kind)) { toast(SHEETS[kind].empty); return; }
     if (pdfBusy) return;
     pdfBusy = true;
     const label = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'جاري التجهيز…'; }
     const sheet = $('#printSheet');
     try {
-      buildSheet(iso, data);
+      buildSheet(iso, data, kind);
       sheet.classList.add('render');
       const img = sheet.querySelector('img');
       if (!img.complete) await new Promise(r => { img.onload = img.onerror = r; });
@@ -486,7 +502,7 @@
         pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, (end - y) * k);
         first = false; y = end;
       }
-      await saveFile(`كشف-التأمين-${iso}.pdf`, pdf.output('blob'), `taameen-${iso}.pdf`);
+      await saveFile(`${SHEETS[kind].file}-${iso}.pdf`, pdf.output('blob'), `${SHEETS[kind].plain}-${iso}.pdf`);
     } catch (e) {
       console.error(e); toast('تعذّر تجهيز الـ PDF');
     } finally {
@@ -529,7 +545,7 @@
       const names = Object.keys(h.absent || {}).map(nm).join('، ');
       const sw = (h.swaps || []).map(s => nm(s.a)).join('، ');
       return `<div class="hist-item"><div><b>${esc(weekdayName(iso))} ${gHTML(iso)}</b><small>الغائبون: ${esc(names) || '—'} · ${arNum((h.rows || []).length)} حصة${sw ? ` · تبديل: ${esc(sw)}` : ''}</small></div>
-        <div class="btn-row"><button class="btn" data-open="${iso}">فتح</button><button class="btn" data-hpdf="${iso}">PDF</button><button class="btn danger" data-del="${iso}">حذف</button></div></div>`;
+        <div class="btn-row"><button class="btn" data-open="${iso}">فتح</button><button class="btn" data-hpdf="${iso}">PDF التأمين</button>${(h.swaps || []).length ? `<button class="btn" data-hspdf="${iso}">PDF التبديل</button>` : ''}<button class="btn danger" data-del="${iso}">حذف</button></div></div>`;
     }).join('') : '<p class="muted">ما فيه أيام مسجّلة للحين. أول ما تختار غائبين أو تضيف تبديل، اليوم يتسجّل تلقائيًا.</p>';
   }
 
@@ -610,7 +626,7 @@
     r.sub = sel.value; r.m = true;
     commit(); renderResults();
   });
-  if (!claudeHost) $('#btnPrint').hidden = false;
+  if (!claudeHost) { $('#btnPrint').hidden = false; $('#btnSwapPrint').hidden = false; }
   $('#btnPrint').addEventListener('click', () => printDay(date, state));
   $('#btnPdf').addEventListener('click', e => pdfDay(date, state, e.currentTarget));
 
@@ -643,6 +659,8 @@
     else Object.assign(it, { b: '', s2: '', t2: '', m: true, none: true });
     afterChange();
   });
+  $('#btnSwapPdf').addEventListener('click', e => pdfDay(date, state, e.currentTarget, 'swap'));
+  $('#btnSwapPrint').addEventListener('click', () => printDay(date, state, 'swap'));
   $('#swapList').addEventListener('click', async e => {
     const d = e.target.closest('[data-swdel]'); if (!d) return;
     const sw = state.swaps[+d.dataset.swdel];
@@ -653,9 +671,10 @@
 
   $('#statsSort').addEventListener('change', renderStats);
   $('#historyList').addEventListener('click', async e => {
-    const o = e.target.closest('[data-open]'), p = e.target.closest('[data-hpdf]'), d = e.target.closest('[data-del]');
+    const o = e.target.closest('[data-open]'), p = e.target.closest('[data-hpdf]'), ps = e.target.closest('[data-hspdf]'), d = e.target.closest('[data-del]');
     if (o) { loadDate(o.dataset.open); showTab('today'); }
     if (p) pdfDay(p.dataset.hpdf, db.history[p.dataset.hpdf], p);
+    if (ps) pdfDay(ps.dataset.hspdf, db.history[ps.dataset.hspdf], ps, 'swap');
     if (d && await ask(`حذف يوم ${fmtG(d.dataset.del)} من السجل؟`, 'حذف')) {
       delete db.history[d.dataset.del]; persist();
       if (d.dataset.del === date) state = emptyDay();

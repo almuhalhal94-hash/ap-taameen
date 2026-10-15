@@ -235,6 +235,8 @@ tr:last-child td{border-bottom:0}
 .ps-table tr{break-inside:avoid}
 .ps-table tr.ps-grp td{background:#fbf3e3;text-align:right;font-size:14px;padding:6px 10px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ps-table tr.ps-grp b{color:#7a0a16}
+.ps-table td.muted-cell{color:#555;font-size:12.5px}
+.ps-table tr.ps-sigrow td{background:#fffaf0;text-align:right;height:40px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ps-note{font-size:13px;margin:12px 0 0;color:#333}
 .ps-foot{display:flex;justify-content:space-between;margin-top:36px;gap:30px;break-inside:avoid}
 .ps-foot>div{text-align:center;min-width:42%}
