@@ -18,7 +18,7 @@
       <div>
         <p class="hero-kicker">مكتب المدير المساعد</p>
         <h1>تأمين الحصص</h1>
-        <p class="hero-sub">اختر الغائبين، والنظام يوزّع حصصهم على الموجودين بعدالة — وبعدها اطبع الكشف للتوقيع.</p>
+        <p class="hero-sub">اختر الغائبين أو سجّل طلب تبديل، والنظام يوزّع الحصص بعدالة ويحفظها تلقائيًا — وبعدها نزّل الكشف PDF للتوقيع.</p>
       </div>
       <div class="hero-date" id="heroDate"></div>
     </div>
@@ -26,28 +26,30 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" class="tab active" data-tab="today">تأمين اليوم</button>
+    <button role="tab" class="tab" data-tab="swaps">التبديل والاستئذان</button>
     <button role="tab" class="tab" data-tab="stats">الإحصائيات والسجل</button>
     <button role="tab" class="tab" data-tab="teachers">المعلمون والجدول</button>
     <button role="tab" class="tab" data-tab="settings">الإعدادات</button>
   </nav>
 
   <main>
-    <!-- ============ تأمين اليوم ============ -->
-    <section class="panel active" id="tab-today">
+    <div id="dateArea">
       <div class="card date-card">
         <label class="field">
           <span>تاريخ التأمين</span>
           <input type="date" id="dateInput">
         </label>
         <div class="day-info" id="dayInfo"></div>
-        <div class="saved-flag" id="savedFlag" hidden>✓ هذا اليوم محفوظ في السجل</div>
+        <div class="saved-flag" id="savedFlag" hidden>✓ محفوظ تلقائيًا في السجل</div>
       </div>
 
       <div id="weekendMsg" class="card empty" hidden>
         <strong>هذا اليوم عطلة نهاية الأسبوع</strong>
         <p>اختر يومًا من الأحد إلى الخميس.</p>
       </div>
-
+    </div>
+    <!-- ============ تأمين اليوم ============ -->
+    <section class="panel active" id="tab-today">
       <div id="dayWork">
         <div class="card">
           <div class="card-head">
@@ -63,24 +65,42 @@
           <div id="absSlots"></div>
         </div>
 
-        <div class="actions sticky-actions">
-          <button class="btn primary" id="btnDistribute">وزّع التأمين تلقائيًا</button>
-          <span class="actions-note" id="needNote"></span>
-        </div>
+        <p class="actions-note" id="needNote"></p>
 
         <div class="card" id="resultCard" hidden>
           <div class="card-head">
             <h2><span class="step">٣</span> جدول التأمين</h2>
             <div class="btn-row">
-              <button class="btn" id="btnRedistribute" title="إعادة التوزيع التلقائي">إعادة التوزيع</button>
-              <button class="btn gold" id="btnSave">اعتماد وحفظ</button>
-              <button class="btn primary" id="btnPrint">طباعة PDF</button>
+              <button class="btn" id="btnRedistribute" title="يلغي اختياراتك اليدوية ويعيد التوزيع">إعادة التوزيع</button>
+              <button class="btn" id="btnPrint" hidden>طباعة</button>
+              <button class="btn primary" id="btnPdf">تنزيل الكشف PDF</button>
             </div>
           </div>
-          <p class="hint">تقدر تغيّر المؤمِّن من القائمة. الأسماء مرتبة من الأنسب: نفس القسم أولًا ثم الأقل تأمينًا والأخف نصابًا اليوم.</p>
+          <p class="hint">التوزيع تلقائي ويتحفظ أول بأول. تقدر تغيّر المؤمِّن من القائمة، والأسماء مرتبة من الأنسب: نفس القسم أولًا ثم الأقل تأمينًا والأخف نصابًا اليوم.</p>
           <div class="table-wrap"><table class="res-table" id="resTable"></table></div>
           <div class="load-today" id="loadToday"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- ============ التبديل ============ -->
+    <section class="panel" id="tab-swaps">
+      <div id="swapWork">
+        <div class="card">
+          <h2>طلب تبديل أو استئذان</h2>
+          <p class="hint">معلم عنده موعد ويبي يطلع؟ اختره وحدد وقت خروجه، والنظام يدوّر له زميل يدرّس نفس الصف في نفس اليوم ويبادله الحصة. اللي ما يلقى له تبديل يتحوّل تلقائيًا لجدول التأمين.</p>
+          <div class="grid2">
+            <label class="field"><span>المعلم</span><select id="swTeacher"></select></label>
+            <label class="field"><span>السبب (اختياري)</span><input type="text" id="swReason" placeholder="مثال: موعد مستشفى"></label>
+          </div>
+          <div class="sw-mode" id="swModeWrap" hidden>
+            <label class="check"><input type="radio" name="swMode" value="from" checked> يخرج من بداية الحصة <select id="swFrom" class="select-sm"></select> إلى نهاية الدوام</label>
+            <label class="check"><input type="radio" name="swMode" value="pick"> حصص محددة فقط</label>
+            <div class="slot-pills" id="swPills" hidden></div>
+          </div>
+          <div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btnSwap" disabled>رتّب التبديل تلقائيًا</button></div>
+        </div>
+        <div id="swapList"></div>
       </div>
     </section>
 
@@ -154,8 +174,17 @@
 <!-- ============ كشف الطباعة ============ -->
 <div id="printSheet" class="print-sheet" aria-hidden="true"></div>
 
+<div id="modal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalMsg">
+    <p id="modalMsg"></p>
+    <div class="btn-row"><button class="btn primary" id="modalOk">نعم</button><button class="btn" id="modalNo">إلغاء</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="assets/vendor/html2canvas.min.js"></script>
+<script src="assets/vendor/jspdf.umd.min.js"></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>
