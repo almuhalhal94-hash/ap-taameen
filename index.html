@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تأمين الحصص — مدرسة ابن رشد</title>
+<meta name="description" content="توزيع تأمين الحصص على المعلمين بعدالة وطباعة كشف التأمين اليومي للتوقيع — مدرسة ابن رشد الإعدادية للبنين">
+<meta name="theme-color" content="#7a0a16">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="moe-strip"><img src="assets/header.jpg" alt="مملكة البحرين — وزارة التربية والتعليم — إدارة العمليات التعليمية المنطقة 3 — مدرسة ابن رشد الإعدادية للبنين" width="1200" height="226"></div>
+
+  <header class="hero">
+    <div class="hero-in">
+      <div>
+        <p class="hero-kicker">مكتب المدير المساعد</p>
+        <h1>تأمين الحصص</h1>
+        <p class="hero-sub">اختر الغائبين، والنظام يوزّع حصصهم على الموجودين بعدالة — وبعدها اطبع الكشف للتوقيع.</p>
+      </div>
+      <div class="hero-date" id="heroDate"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab active" data-tab="today">تأمين اليوم</button>
+    <button role="tab" class="tab" data-tab="stats">الإحصائيات والسجل</button>
+    <button role="tab" class="tab" data-tab="teachers">المعلمون والجدول</button>
+    <button role="tab" class="tab" data-tab="settings">الإعدادات</button>
+  </nav>
+
+  <main>
+    <!-- ============ تأمين اليوم ============ -->
+    <section class="panel active" id="tab-today">
+      <div class="card date-card">
+        <label class="field">
+          <span>تاريخ التأمين</span>
+          <input type="date" id="dateInput">
+        </label>
+        <div class="day-info" id="dayInfo"></div>
+        <div class="saved-flag" id="savedFlag" hidden>✓ هذا اليوم محفوظ في السجل</div>
+      </div>
+
+      <div id="weekendMsg" class="card empty" hidden>
+        <strong>هذا اليوم عطلة نهاية الأسبوع</strong>
+        <p>اختر يومًا من الأحد إلى الخميس.</p>
+      </div>
+
+      <div id="dayWork">
+        <div class="card">
+          <div class="card-head">
+            <h2><span class="step">١</span> من الغائب اليوم؟</h2>
+            <input type="search" id="absSearch" class="search" placeholder="ابحث باسم المعلم…">
+          </div>
+          <p class="hint">اضغط على اسم المعلم الغائب. تقدر تحدد حصص معيّنة لو كان غيابه جزئي (استئذان مثلًا). المعلمون غير المتواجدين اليوم حسب الجدول يظهرون باهتين ولا يدخلون في التأمين.</p>
+          <div id="absList" class="dept-list"></div>
+        </div>
+
+        <div class="card" id="absDetail" hidden>
+          <h2><span class="step">٢</span> حصص الغائبين اليوم</h2>
+          <div id="absSlots"></div>
+        </div>
+
+        <div class="actions sticky-actions">
+          <button class="btn primary" id="btnDistribute">وزّع التأمين تلقائيًا</button>
+          <span class="actions-note" id="needNote"></span>
+        </div>
+
+        <div class="card" id="resultCard" hidden>
+          <div class="card-head">
+            <h2><span class="step">٣</span> جدول التأمين</h2>
+            <div class="btn-row">
+              <button class="btn" id="btnRedistribute" title="إعادة التوزيع التلقائي">إعادة التوزيع</button>
+              <button class="btn gold" id="btnSave">اعتماد وحفظ</button>
+              <button class="btn primary" id="btnPrint">طباعة PDF</button>
+            </div>
+          </div>
+          <p class="hint">تقدر تغيّر المؤمِّن من القائمة. الأسماء مرتبة من الأنسب: نفس القسم أولًا ثم الأقل تأمينًا والأخف نصابًا اليوم.</p>
+          <div class="table-wrap"><table class="res-table" id="resTable"></table></div>
+          <div class="load-today" id="loadToday"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ الإحصائيات ============ -->
+    <section class="panel" id="tab-stats">
+      <div class="kpis" id="kpis"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>عدد مرات التأمين لكل معلم</h2>
+          <select id="statsSort" class="select-sm">
+            <option value="count">الأكثر تأمينًا</option>
+            <option value="name">حسب الاسم</option>
+            <option value="dept">حسب القسم</option>
+          </select>
+        </div>
+        <p class="hint">النسبة = تأمينات المعلم ÷ إجمالي حصص التأمين المحفوظة. «العبء» يقارن تأميناته بنصابه الأسبوعي.</p>
+        <div class="table-wrap"><table class="stats-table" id="statsTable"></table></div>
+      </div>
+      <div class="card">
+        <h2>سجل أيام التأمين</h2>
+        <div id="historyList"></div>
+      </div>
+    </section>
+
+    <!-- ============ المعلمون ============ -->
+    <section class="panel" id="tab-teachers">
+      <div class="card">
+        <div class="card-head">
+          <h2>المعلمون وأيام التواجد</h2>
+          <input type="search" id="tSearch" class="search" placeholder="ابحث…">
+        </div>
+        <p class="hint">الأيام مأخوذة من الجدول العام: اليوم اللي ما فيه للمعلم أي حصة أو اجتماع يُعتبر غير متواجد فيه. تقدر تعدّلها يدويًا، أو تعلّم المعلم «مفرّغ كليًا» (منتقل لمدرسة أخرى) فما يدخل في التأمين أبدًا.</p>
+        <div id="teacherList"></div>
+      </div>
+    </section>
+
+    <!-- ============ الإعدادات ============ -->
+    <section class="panel" id="tab-settings">
+      <div class="card">
+        <h2>بيانات الكشف المطبوع</h2>
+        <div class="grid2">
+          <label class="field"><span>اسم مدير المدرسة</span><input type="text" id="setPrincipal" placeholder="يظهر أسفل الكشف"></label>
+          <label class="field"><span>اسم المدير المساعد</span><input type="text" id="setAssistant" placeholder="اختياري"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h2>قواعد التوزيع</h2>
+        <label class="field inline"><span>أقصى عدد تأمين للمعلم في اليوم</span>
+          <select id="setMax"><option>1</option><option>2</option><option>3</option></select>
+        </label>
+        <label class="check"><input type="checkbox" id="setDept"> الأولوية لمعلمي نفس القسم</label>
+        <label class="check"><input type="checkbox" id="setBreak"> تأمين مراقبة الفسحة للغائب</label>
+        <label class="check"><input type="checkbox" id="setConsec"> تجنّب أن يصير عند المعلم ٣ حصص متتالية أو أكثر</label>
+      </div>
+      <div class="card">
+        <h2>النسخ الاحتياطي</h2>
+        <p class="hint">البيانات محفوظة في هذا المتصفح. خذ نسخة احتياطية بين فترة وفترة، وتقدر تسترجعها في أي جهاز.</p>
+        <div class="btn-row">
+          <button class="btn" id="btnExport">تنزيل نسخة احتياطية</button>
+          <label class="btn file-btn">استرجاع نسخة<input type="file" id="fileImport" accept="application/json,.json"></label>
+          <button class="btn danger" id="btnReset">مسح السجل</button>
+        </div>
+      </div>
+      <p class="source-note" id="sourceNote"></p>
+    </section>
+  </main>
+
+  <footer class="foot">مدرسة ابن رشد الإعدادية للبنين — علمًا نتميّز، قيمًا نسمو، وطنًا نبني</footer>
+</div>
+
+<!-- ============ كشف الطباعة ============ -->
+<div id="printSheet" class="print-sheet" aria-hidden="true"></div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
