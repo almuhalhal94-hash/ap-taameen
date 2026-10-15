@@ -392,17 +392,18 @@
     $('#swapBar').hidden = !state.swaps.length;
     const hist = historyCounts(date);
     $('#swapList').innerHTML = state.swaps.map((sw, si) => {
-      const fromTxt = sw.mode === 'from' ? `يخرج من الحصة ${SLOT_NAME[sw.from]}` : `حصص محددة`;
-      const items = sw.items.map((it, ii) => {
-        const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))} — يأخذ ${SLOT_NAME[it.s]} ويرد له ${SLOT_NAME[o.s2]} (${esc(o.t2)})${hist.swB[o.b] ? ` · بدّل ${arNum(hist.swB[o.b])}` : ''}</option>`).join('');
-        const state_ = it.b ? `<span class="badge dept">تبديل</span> ${esc(nm(it.b))} يدخل ${SLOT_NAME[it.s]}، وصاحب الطلب يدخل بداله ${SLOT_NAME[it.s2]}` : `<span class="badge none">ما فيه تبديل</span> تحوّلت لجدول التأمين`;
-        return `<tr class="${it.b ? '' : 'missing'}"><td class="per" data-l="الحصة">${SLOT_NAME[it.s]}</td><td data-l="الصف">${codeHTML(it.c)}</td><td data-l="المادة">${esc(it.t)}</td>
-          <td data-l="التبديل"><select data-sw="${si}" data-it="${ii}" aria-label="خيار التبديل"><option value="">— بدون تبديل (تأمين) —</option>${opts}</select><span class="why">${state_}</span></td></tr>`;
+      const when = sw.mode === 'from' ? `يطلع من الحصة ${SLOT_NAME[sw.from]}` : 'حصص محددة';
+      const rows = sw.items.map((it, ii) => {
+        const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))} (مقابل ${SLOT_NAME[o.s2]})</option>`).join('');
+        const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="">— للتأمين —</option>${opts}</select>`;
+        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${SLOT_NAME[it.s]}</td><td data-l="الأصلي">${esc(nm(sw.a))}</td><td data-l="يدخلها">${sel}</td></tr>`;
+        const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${SLOT_NAME[it.s2]}</td><td data-l="الأصلي">${esc(nm(it.b))}</td><td data-l="يدخلها"><b>${esc(nm(sw.a))}</b></td></tr>` : '';
+        return first + second;
       }).join('');
-      return `<div class="card"><div class="card-head"><h2>${esc(nm(sw.a))}</h2><div class="btn-row"><button class="btn danger" data-swdel="${si}">إلغاء الطلب</button></div></div>
-        <p class="hint">${fromTxt}${sw.reason ? ` · السبب: ${esc(sw.reason)}` : ''}${sw.items.length ? '' : ' · ما عنده حصص تدريس في هالوقت'}</p>
-        ${sw.items.length ? `<div class="table-wrap"><table class="res-table"><thead><tr><th>الحصة</th><th>الصف</th><th>المادة</th><th>التبديل</th></tr></thead><tbody>${items}</tbody></table></div>` : ''}</div>`;
-    }).join('') || '<div class="card empty"><strong>ما فيه طلبات تبديل لهذا اليوم</strong><p>الطلبات اللي تضيفها تظهر هنا، وتدخل في الكشف المطبوع.</p></div>';
+      return `<div class="card"><div class="card-head"><h2>${esc(nm(sw.a))}</h2><button class="btn danger" data-swdel="${si}">إلغاء الطلب</button></div>
+        <p class="hint">${when}${sw.reason ? ` · ${esc(sw.reason)}` : ''}${sw.items.length ? '' : ' · ما عنده حصص في هالوقت'}</p>
+        ${sw.items.length ? `<div class="table-wrap"><table class="res-table swap-table"><thead><tr><th>الصف</th><th>الحصة</th><th>الأصلي</th><th>يدخلها</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}</div>`;
+    }).join('') || '<div class="card empty"><strong>ما فيه طلبات تبديل لهذا اليوم</strong></div>';
   }
 
   // ---------------- كشف الطباعة / PDF ----------------
@@ -427,18 +428,17 @@
     } else {
       let m = 0;
       const tbody = (data.swaps || []).filter(sw => sw.items.length).map(sw => {
-        const when = sw.mode === 'from' ? `يخرج من بداية الحصة ${SLOT_NAME[sw.from]}` : `حصص محددة`;
-        return `<tr class="ps-grp"><td colspan="6">صاحب الطلب: <b>${esc(nm(sw.a))}</b> — ${when}${sw.reason ? ` — السبب: ${esc(sw.reason)}` : ''}</td></tr>` +
+        const when = sw.mode === 'from' ? `يطلع من الحصة ${SLOT_NAME[sw.from]}` : 'حصص محددة';
+        return `<tr class="ps-grp"><td colspan="6"><b>${esc(nm(sw.a))}</b> — ${when}${sw.reason ? ` — ${esc(sw.reason)}` : ''}</td></tr>` +
           sw.items.map(it => it.b
-            ? `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}<br><small>${esc(it.t)}</small></td>
-                <td class="nm">${esc(nm(it.b))}<br><small>يدخل الحصة ${SLOT_NAME[it.s]}</small></td><td>${SLOT_NAME[it.s2]}<br><small>يدخلها ${esc(nm(sw.a))}</small></td><td class="sig"></td></tr>`
-            : `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}<br><small>${esc(it.t)}</small></td><td colspan="3" class="muted-cell">ما فيه تبديل — الحصة محوّلة لكشف التأمين</td></tr>`).join('') +
-          `<tr class="ps-sigrow"><td colspan="3">توقيع صاحب الطلب: <b>${esc(nm(sw.a))}</b></td><td colspan="3" class="sig"></td></tr>`;
+            ? `<tr><td rowspan="2">${arNum(++m)}</td><td rowspan="2">${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}</td><td>${esc(nm(sw.a))}</td><td class="nm">${esc(nm(it.b))}</td><td class="sig"></td></tr>
+               <tr><td>${SLOT_NAME[it.s2]}</td><td>${esc(nm(it.b))}</td><td class="nm">${esc(nm(sw.a))}</td><td class="sig"></td></tr>`
+            : `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}</td><td>${esc(nm(sw.a))}</td><td colspan="2" class="muted-cell">للتأمين</td></tr>`).join('');
       }).join('');
       body = `<table class="ps-table">
-        <thead><tr><th style="width:6%">م</th><th style="width:9%">الصف</th><th style="width:15%">حصة صاحب الطلب</th><th>المعلم البديل</th><th style="width:20%">الحصة المقابلة</th><th style="width:22%">توقيع البديل بالعلم</th></tr></thead>
+        <thead><tr><th style="width:6%">م</th><th style="width:9%">الصف</th><th style="width:11%">الحصة</th><th style="width:24%">المعلم الأصلي</th><th>يدخلها بداله</th><th style="width:22%">توقيعه بالعلم</th></tr></thead>
         <tbody>${tbody}</tbody></table>`;
-      note = 'تم تبديل الحصص أعلاه بموافقة الطرفين، ويلتزم كل معلم بالحصة المقابلة في موعدها. شاكرين تعاونكم.';
+      note = 'كل معلم يدخل الحصة المكتوبة أمام اسمه في عمود «يدخلها بداله».';
     }
     $('#printSheet').innerHTML = `
       <div class="ps-head"><img src="assets/header.jpg" alt=""></div>
