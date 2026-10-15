@@ -411,7 +411,7 @@
     cover: { title: 'كشف تأمين الحصص', file: 'كشف-التأمين', plain: 'taameen', empty: 'ما فيه حصص تأمين لهذا اليوم' },
     swap: { title: 'كشف تبديل الحصص', file: 'كشف-التبديل', plain: 'tabdeel', empty: 'ما فيه تبديلات لهذا اليوم' }
   };
-  const hasContent = (data, kind) => kind === 'swap' ? (data.swaps || []).some(sw => sw.items.length) : (data.rows || []).length > 0;
+  const hasContent = (data, kind) => kind === 'swap' ? (data.swaps || []).some(sw => sw.items.some(it => it.b)) : (data.rows || []).length > 0;
 
   function buildSheet(iso, data, kind) {
     const s = db.settings;
@@ -427,25 +427,20 @@
       note = 'نأمل من المعلمين الأفاضل التوقيع بالعلم، والتواجد في الصف بداية الحصة. شاكرين تعاونكم.';
     } else {
       let m = 0;
-      const tbody = (data.swaps || []).filter(sw => sw.items.length).map(sw => {
-        const when = sw.mode === 'from' ? `يطلع من الحصة ${SLOT_NAME[sw.from]}` : 'حصص محددة';
-        return `<tr class="ps-grp"><td colspan="6"><b>${esc(nm(sw.a))}</b> — ${when}${sw.reason ? ` — ${esc(sw.reason)}` : ''}</td></tr>` +
-          sw.items.map(it => it.b
-            ? `<tr><td rowspan="2">${arNum(++m)}</td><td rowspan="2">${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}</td><td>${esc(nm(sw.a))}</td><td class="nm">${esc(nm(it.b))}</td><td class="sig"></td></tr>
-               <tr><td>${SLOT_NAME[it.s2]}</td><td>${esc(nm(it.b))}</td><td class="nm">${esc(nm(sw.a))}</td><td class="sig"></td></tr>`
-            : `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td>${SLOT_NAME[it.s]}</td><td>${esc(nm(sw.a))}</td><td colspan="2" class="muted-cell">للتأمين</td></tr>`).join('');
-      }).join('');
+      const tbody = (data.swaps || []).flatMap(sw => sw.items.filter(it => it.b).map(it =>
+        `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td><td class="nm">${esc(nm(sw.a))}</td><td>${SLOT_NAME[it.s]}</td><td class="sig"></td>
+          <td class="nm">${esc(nm(it.b))}</td><td>${SLOT_NAME[it.s2]}</td><td class="sig"></td></tr>`)).join('');
       body = `<table class="ps-table">
-        <thead><tr><th style="width:6%">م</th><th style="width:9%">الصف</th><th style="width:11%">الحصة</th><th style="width:24%">المعلم الأصلي</th><th>يدخلها بداله</th><th style="width:22%">توقيعه بالعلم</th></tr></thead>
+        <thead><tr><th style="width:5%">م</th><th style="width:8%">الصف</th><th>المعلم</th><th style="width:10%">حصته</th><th style="width:13%">التوقيع</th><th>المعلم</th><th style="width:10%">حصته</th><th style="width:13%">التوقيع</th></tr></thead>
         <tbody>${tbody}</tbody></table>`;
-      note = 'كل معلم يدخل الحصة المكتوبة أمام اسمه في عمود «يدخلها بداله».';
+      note = '';
     }
     $('#printSheet').innerHTML = `
       <div class="ps-head"><img src="assets/header.jpg" alt=""></div>
       <h1 class="ps-title">${SHEETS[kind].title}</h1>
       <div class="ps-meta"><span>اليوم: <b>${esc(weekdayName(iso))}</b></span><span>التاريخ: <b>${gHTML(iso)}</b></span><span>الموافق: <b>${esc(fmtH(iso))}</b></span></div>
       ${body}
-      <p class="ps-note">${note}</p>
+      ${note ? `<p class="ps-note">${note}</p>` : ''}
       <div class="ps-foot">
         <div><div class="role">المدير المساعد</div><div class="pname">${esc(s.assistant)}</div><div class="sigline">التوقيع</div></div>
         <div><div class="role">مدير المدرسة</div><div class="pname">${esc(s.principal)}</div><div class="sigline">التوقيع</div></div>
