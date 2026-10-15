@@ -427,10 +427,15 @@
       note = 'نأمل من المعلمين الأفاضل التوقيع بالعلم، والتواجد في الصف بداية الحصة. شاكرين تعاونكم.';
     } else {
       let m = 0;
-      const tbody = (data.swaps || []).flatMap(sw => sw.items.filter(it => it.b).map(it =>
-        `<tr><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td>
-          <td class="nm">${esc(nm(sw.a))}<br><small>الحصة ${SLOT_NAME[it.s2]}</small></td><td class="sig"></td>
-          <td class="nm">${esc(nm(it.b))}<br><small>الحصة ${SLOT_NAME[it.s]}</small></td><td class="sig"></td></tr>`)).join('');
+      const tbody = (data.swaps || []).map(sw => {
+        const its = sw.items.filter(it => it.b);
+        if (!its.length) return '';
+        const n = its.length;
+        const who = `${esc(nm(sw.a))}${its.map(it => `<br><small>الحصة ${SLOT_NAME[it.s2]}</small>`).join('')}`;
+        return its.map((it, i) => `<tr${i === 0 ? ' class="pair"' : ''}><td>${arNum(++m)}</td><td>${codeHTML(it.c)}</td>
+          ${i === 0 ? `<td class="nm" rowspan="${n}">${who}</td><td class="sig" rowspan="${n}"></td>` : ''}
+          <td class="nm">${esc(nm(it.b))}<br><small>الحصة ${SLOT_NAME[it.s]}</small></td><td class="sig"></td></tr>`).join('');
+      }).join('');
       body = `<table class="ps-table">
         <thead><tr><th style="width:5%">م</th><th style="width:9%">الصف</th><th>المعلم المستأذن</th><th style="width:16%">التوقيع</th><th>المعلم البديل</th><th style="width:16%">التوقيع</th></tr></thead>
         <tbody>${tbody}</tbody></table>`;
