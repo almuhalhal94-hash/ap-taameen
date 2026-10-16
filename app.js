@@ -16,7 +16,7 @@
 
   // ---------------- التخزين ----------------
   const defaults = () => ({
-    settings: { principal: '', assistant: '', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم' },
+    settings: { principal: '', assistant: '', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم' },
     avail: {},     // tid -> {released, days}
     history: {}    // 'YYYY-MM-DD' -> {absent:{tid:[slots]}, rows:[], swaps:[], savedAt}
   });
@@ -59,6 +59,20 @@
   const sortKey = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };
   const isE = id => typeof id === 'string' && id.startsWith('E:');
   const nm = id => isE(id) ? id.slice(2) : byId[id] ? byId[id].name : id;
+  // المشرفون: يأمّنون صفوف مراحلهم فقط
+  const ALL_CODES = [...new Set(T.flatMap(t => Object.values(t.cells).flatMap(c => c.c ? c.c.split(' / ') : [])))].sort();
+  const GRADES = [...new Set(ALL_CODES.map(c => c.slice(1)))].sort((a, b) => (a[0] === 'ب' ? -1 : 1) - (b[0] === 'ب' ? -1 : 1) || a.localeCompare(b));
+  const GRADE_NAME = g => ({ 'ب6': 'السادس', 'ع1': 'أول إعدادي', 'ع2': 'ثاني إعدادي', 'ع3': 'ثالث إعدادي' }[g] || g);
+  const supOf = id => (db.settings.supervise || {})[id] || [];
+  const supLabel = id => {
+    const list = supOf(id); if (!list.length) return '';
+    return GRADES.map(g => {
+      const all = ALL_CODES.filter(c => c.slice(1) === g), mine = list.filter(c => c.slice(1) === g);
+      if (!mine.length) return '';
+      return mine.length === all.length ? GRADE_NAME(g) : `${GRADE_NAME(g).replace(' إعدادي', '')} ${mine.map(c => arNum(c[0])).join(' و')}`;
+    }).filter(Boolean).join('، ');
+  };
+  const supAllows = (id, code) => { const list = supOf(id); return !list.length || (!!code && code.split(' / ').every(c => list.includes(c))); };
   const emergencyList = () => (db.settings.emergency || '').split('\n').map(x => x.trim()).filter(Boolean);
 
   let toastTimer;
@@ -284,7 +298,7 @@
     const taken = new Set(rows.filter(r => r !== row && r.slot === s && r.sub).map(r => r.sub));
     const tc = {}, extra = {};
     rows.forEach(r => { if (r !== row && r.sub) { tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
-    const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOut(t.id, s) && !ctx.cell(t.id, s) && !taken.has(t.id) && !(row.refused || []).includes(t.id));
+    const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOut(t.id, s) && !ctx.cell(t.id, s) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c));
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
@@ -651,9 +665,26 @@
       const a = availOf(t);
       const days = DAYS.map((n, d) => `<button class="daytog ${a.days.includes(d) ? 'on' : ''}" data-tday="${t.id}" data-d="${d}" ${a.released ? 'disabled' : ''}>${n}</button>`).join('');
       return `<div class="t-row"><div class="t-top"><div class="t-name"><b>${esc(t.name)}</b><small>${esc(t.dept)} · ${arNum(t.teaching)} حصة تدريس · المجموع ${arNum(t.total)}</small></div>
-        <div class="t-ctrl">${days}<button class="relbtn ${a.released ? 'on' : ''}" data-rel="${t.id}">${a.released ? 'مفرّغ كليًا' : 'تفريغ كلي'}</button><button class="link" data-tt="${t.id}">${openTT.has(t.id) ? 'إخفاء الجدول' : 'الجدول'}</button></div></div>
+        <div class="t-ctrl">${days}<button class="relbtn ${a.released ? 'on' : ''}" data-rel="${t.id}">${a.released ? 'مفرّغ كليًا' : 'تفريغ كلي'}</button><button class="relbtn ${supOf(t.id).length ? 'sup' : ''}" data-sup="${t.id}">${supOf(t.id).length ? 'مشرف' : 'إشراف'}</button><button class="link" data-tt="${t.id}">${openTT.has(t.id) ? 'إخفاء الجدول' : 'الجدول'}</button></div></div>
+        ${supOf(t.id).length ? `<p class="sup-note">مشرف على: <b>${esc(supLabel(t.id))}</b> — يأمّن هالصفوف بس</p>` : ''}
+        ${openSup.has(t.id) ? supHTML(t) : ''}
         ${openTT.has(t.id) ? ttHTML(t) : ''}</div>`;
     }).join('');
+  }
+  const openSup = new Set();
+  function supHTML(t) {
+    const list = supOf(t.id);
+    return `<div class="sup-box">${GRADES.map(g => {
+      const codes = ALL_CODES.filter(c => c.slice(1) === g);
+      const all = codes.every(c => list.includes(c));
+      return `<div class="sup-grade"><label class="check"><input type="checkbox" data-supg="${t.id}" data-g="${g}" ${all ? 'checked' : ''}> <b>${GRADE_NAME(g)}</b></label>
+        <span class="sup-secs">${codes.map(c => `<label class="check"><input type="checkbox" data-supc="${t.id}" data-c="${c}" ${list.includes(c) ? 'checked' : ''}> ${codeHTML(c)}</label>`).join('')}</span></div>`;
+    }).join('')}<small class="muted">إذا ما اخترت شي، المعلم يأمّن أي صف عادي.</small></div>`;
+  }
+  function setSup(id, list) {
+    const sup = { ...(db.settings.supervise || {}) };
+    if (list.length) sup[id] = [...new Set(list)].sort(); else delete sup[id];
+    db.settings.supervise = sup; persist(); cloudConfig();
   }
   function ttHTML(t) {
     const head = SLOT_ORDER.map(s => `<th>${SLOT_NAME[s]}</th>`).join('');
@@ -780,8 +811,18 @@
   });
 
   $('#tSearch').addEventListener('input', renderTeachers);
+  $('#teacherList').addEventListener('change', e => {
+    const g = e.target.closest('[data-supg]'), c = e.target.closest('[data-supc]');
+    if (!g && !c) return;
+    const id = (g || c).dataset.supg || (g || c).dataset.supc;
+    let list = supOf(id).slice();
+    if (g) { const codes = ALL_CODES.filter(x => x.slice(1) === g.dataset.g); list = g.checked ? [...list, ...codes] : list.filter(x => !codes.includes(x)); }
+    else list = c.checked ? [...list, c.dataset.c] : list.filter(x => x !== c.dataset.c);
+    setSup(id, list); renderTeachers();
+  });
   $('#teacherList').addEventListener('click', e => {
-    const dt = e.target.closest('[data-tday]'), rel = e.target.closest('[data-rel]'), tt = e.target.closest('[data-tt]');
+    const dt = e.target.closest('[data-tday]'), rel = e.target.closest('[data-rel]'), tt = e.target.closest('[data-tt]'), sp = e.target.closest('[data-sup]');
+    if (sp) { openSup.has(sp.dataset.sup) ? openSup.delete(sp.dataset.sup) : openSup.add(sp.dataset.sup); renderTeachers(); return; }
     if (dt) {
       const t = byId[dt.dataset.tday], a = { ...availOf(t) }, d = +dt.dataset.d;
       a.days = a.days.includes(d) ? a.days.filter(x => x !== d) : [...a.days, d].sort();
