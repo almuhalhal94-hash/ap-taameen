@@ -557,7 +557,8 @@
       <div class="ps-foot">
         <div><div class="role">المدير المساعد</div><div class="pname">${esc(s.assistant)}</div><div class="sigline">التوقيع</div></div>
         <div><div class="role">مدير المدرسة</div><div class="pname">${esc(s.principal)}</div><div class="sigline">التوقيع</div></div>
-      </div>`;
+      </div>
+      <p class="ps-credit">إعداد: أ. طلال سعود المهلهل</p>`;
   }
 
   function printDay(iso, data, kind = 'cover') {
@@ -588,7 +589,7 @@
       const canvas = await window.html2canvas(sheet, { scale: SCALE, backgroundColor: '#ffffff', useCORS: true, logging: false });
       // نقاط القص بين الصفوف حتى ما ينقسم صف بين صفحتين
       const top0 = sheet.getBoundingClientRect().top;
-      const cuts = [...sheet.querySelectorAll('tr, .ps-sub, .ps-note, .ps-foot')].map(el => el.getBoundingClientRect().top - top0);
+      const cuts = [...sheet.querySelectorAll('tr, .ps-sub, .ps-note, .ps-foot, .ps-credit')].map(el => el.getBoundingClientRect().top - top0);
       const W = sheet.offsetWidth, H = sheet.offsetHeight;
       const pageH = Math.floor(W * 297 / 210);
       const { jsPDF } = window.jspdf;
