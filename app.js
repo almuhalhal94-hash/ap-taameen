@@ -439,7 +439,9 @@
   }
 
   // ---------------- العرض: التبديل ----------------
-  let swDraft = { a: '', from: '', pick: [] };
+  // وقت الخروج: من بداية حصة إلى ما قبل حصة الرجوع (أو نهاية الدوام)
+  let swDraft = { a: '', from: '', to: 'end' };
+  const newDraft = (a = '') => ({ a, from: '', to: 'end' });
   function renderSwapForm() {
     const ctx = context();
     const busyA = new Set(state.swaps.map(s => s.a));
@@ -447,42 +449,44 @@
       const ts = T.filter(t => t.dept === dep && presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !busyA.has(t.id));
       return ts.length ? `<optgroup label="${esc(dep)}">${ts.map(t => `<option value="${t.id}" ${t.id === swDraft.a ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</optgroup>` : '';
     }).join('');
-    if (swDraft.a && (busyA.has(swDraft.a) || ctx.absentSet.has(swDraft.a))) swDraft.a = '';
+    if (swDraft.a && (busyA.has(swDraft.a) || ctx.absentSet.has(swDraft.a))) swDraft = newDraft();
     $('#swTeacher').innerHTML = `<option value="">— اختر المعلم —</option>${opts}`;
     $('#swTeacher').value = swDraft.a;
     const a = swDraft.a;
     $('#swModeWrap').hidden = !a;
-    $('#btnSwap').disabled = !a || !swSlots().length;
-    if (!a) return;
+    if (!a) { $('#btnSwap').disabled = true; return; }
     const teach = dayCells(ctx, a).filter(x => !NON_TEACHING.has(x.cell.t));
-    $('#swFrom').innerHTML = TEACH_SLOTS.map(s => `<option value="${s}" ${s === swDraft.from ? 'selected' : ''}>${SLOT_NAME[s]}</option>`).join('');
-    if (!swDraft.from) { swDraft.from = teach.length ? teach[teach.length - 1].s : '7'; $('#swFrom').value = swDraft.from; }
-    const mode = document.querySelector('input[name=swMode]:checked').value;
-    $('#swPills').hidden = mode !== 'pick';
-    $('#swPills').innerHTML = teach.map(({ s, cell }) => `<button class="pill ${swDraft.pick.includes(s) ? 'on' : ''}" data-swp="${s}">${SLOT_NAME[s]}<small>${codeHTML(cell.c)} ${esc(cell.t)}</small></button>`).join('') || '<span class="muted">ما عنده حصص تدريس اليوم</span>';
+    if (!swDraft.from) swDraft.from = teach.length ? teach[teach.length - 1].s : '7';
+    $('#swFrom').innerHTML = TEACH_SLOTS.map(s => `<option value="${s}">${SLOT_NAME[s]}</option>`).join('');
+    $('#swFrom').value = swDraft.from;
+    const later = TEACH_SLOTS.filter(s => slotIdx(s) > slotIdx(swDraft.from));
+    if (swDraft.to !== 'end' && !later.includes(swDraft.to)) swDraft.to = 'end';
+    $('#swTo').innerHTML = `<option value="end">ما يرجع (لنهاية الدوام)</option>` + later.map(s => `<option value="${s}">يرجع الحصة ${SLOT_NAME[s]}</option>`).join('');
+    $('#swTo').value = swDraft.to;
+    const n = swSlots().length;
+    $('#swCount').textContent = n ? `عنده ${arNum(n)} حصة في هالوقت` : 'ما عنده حصص في هالوقت';
+    $('#btnSwap').disabled = !n;
   }
-  function swSlots() {
-    const a = swDraft.a; if (!a) return [];
-    const ctx = context();
-    const teach = dayCells(ctx, a).filter(x => !NON_TEACHING.has(x.cell.t)).map(x => x.s);
-    const mode = document.querySelector('input[name=swMode]:checked').value;
-    if (mode === 'pick') return teach.filter(s => swDraft.pick.includes(s));
-    const fi = slotIdx(swDraft.from || '7');
-    return teach.filter(s => slotIdx(s) >= fi);
-  }
-  // كل الحصص (حتى غير التدريسية) في وقت الخروج
+  // كل الأوقات اللي يكون فيها برا المدرسة (مع الفسحة)
   function swWindow() {
-    const mode = document.querySelector('input[name=swMode]:checked').value;
-    if (mode === 'pick') return swSlots();
     const fi = slotIdx(swDraft.from || '7');
-    return SLOT_ORDER.filter(s => slotIdx(s) >= fi);
+    const ti = swDraft.to === 'end' ? SLOT_ORDER.length : slotIdx(swDraft.to);
+    return SLOT_ORDER.filter(s => slotIdx(s) >= fi && slotIdx(s) < ti);
   }
+  // حصصه التدريسية داخل وقت الخروج
+  function swSlots() {
+    if (!swDraft.a) return [];
+    const win = swWindow();
+    return dayCells(context(), swDraft.a).filter(x => !NON_TEACHING.has(x.cell.t) && win.includes(x.s)).map(x => x.s);
+  }
+  const swWhen = sw => sw.mode === 'pick' ? 'حصص محددة'
+    : `يطلع من الحصة ${SLOT_NAME[sw.from]}${sw.to && sw.to !== 'end' ? ` ويرجع الحصة ${SLOT_NAME[sw.to]}` : ' لنهاية الدوام'}`;
 
   function renderSwaps() {
     $('#swapBar').hidden = !state.swaps.length;
     const hist = historyCounts(date);
     $('#swapList').innerHTML = state.swaps.map((sw, si) => {
-      const when = sw.mode === 'from' ? `يطلع من الحصة ${SLOT_NAME[sw.from]}` : 'حصص محددة';
+      const when = swWhen(sw);
       const rows = sw.items.map((it, ii) => {
         const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}${o.covering ? ' (عنده تأمين اليوم)' : ''}</option>`).join('');
         const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="">— للتأمين —</option>${opts}</select>`;
@@ -684,7 +688,7 @@
   }
   document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
-  $('#dateInput').addEventListener('change', e => { if (e.target.value) { swDraft = { a: '', from: '', pick: [] }; loadDate(e.target.value); } });
+  $('#dateInput').addEventListener('change', e => { if (e.target.value) { swDraft = newDraft(); loadDate(e.target.value); } });
   $('#absSearch').addEventListener('input', renderAbsList);
 
   const afterChange = () => { recompute(); renderAll(); };
@@ -731,22 +735,15 @@
   $('#btnPdf').addEventListener('click', e => pdfDay(date, state, e.currentTarget));
 
   // التبديل
-  $('#swTeacher').addEventListener('change', e => { swDraft = { a: e.target.value, from: '', pick: [] }; renderSwapForm(); });
+  $('#swTeacher').addEventListener('change', e => { swDraft = newDraft(e.target.value); renderSwapForm(); });
   $('#swFrom').addEventListener('change', e => { swDraft.from = e.target.value; renderSwapForm(); });
-  document.querySelectorAll('input[name=swMode]').forEach(r => r.addEventListener('change', renderSwapForm));
-  $('#swPills').addEventListener('click', e => {
-    const p = e.target.closest('[data-swp]'); if (!p) return;
-    const s = p.dataset.swp;
-    swDraft.pick = swDraft.pick.includes(s) ? swDraft.pick.filter(x => x !== s) : [...swDraft.pick, s];
-    renderSwapForm();
-  });
+  $('#swTo').addEventListener('change', e => { swDraft.to = e.target.value; renderSwapForm(); });
   $('#btnSwap').addEventListener('click', () => {
     const slots = swSlots(); if (!swDraft.a || !slots.length) return;
     const ctx = context();
-    const mode = document.querySelector('input[name=swMode]:checked').value;
     const items = slots.map(s => { const c = ctx.cell(swDraft.a, s); return { s, c: c.c, t: c.t, b: '', s2: '', t2: '' }; });
-    state.swaps.push({ a: swDraft.a, mode, from: swDraft.from, slots: swWindow(), reason: $('#swReason').value.trim(), items });
-    swDraft = { a: '', from: '', pick: [] }; $('#swReason').value = '';
+    state.swaps.push({ a: swDraft.a, mode: 'from', from: swDraft.from, to: swDraft.to, slots: swWindow(), reason: $('#swReason').value.trim(), items });
+    swDraft = newDraft(); $('#swReason').value = '';
     afterChange();
     const sw = state.swaps[state.swaps.length - 1];
     const ok = sw.items.filter(it => it.b).length;
