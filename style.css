@@ -270,3 +270,5 @@ tr:last-child td{border-bottom:0}
 .sup-secs{display:flex;flex-wrap:wrap;gap:4px 12px}
 .foot .credit{display:block;margin-top:4px;font-family:"Readex",sans-serif;font-size:.78rem;color:var(--gold)}
 .ps-credit{text-align:center;font-size:11px;color:#8a6a2a;margin:22px 0 0;border-top:1px solid #e6dccb;padding-top:6px}
+.tm{display:block;font-size:.72em;font-weight:400;color:var(--muted)}
+.ps-table .tm{color:#555}

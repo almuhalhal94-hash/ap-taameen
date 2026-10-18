@@ -2,9 +2,32 @@
   'use strict';
 
   const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-  const SLOT_ORDER = ['1', '2', '3', 'B', '4', '5', '6', '7'];
-  const TEACH_SLOTS = SLOT_ORDER.filter(s => s !== 'B');
-  const SLOT_NAME = { '1': 'الأولى', '2': 'الثانية', '3': 'الثالثة', 'B': 'الفسحة', '4': 'الرابعة', '5': 'الخامسة', '6': 'السادسة', '7': 'السابعة' };
+  // فسحتين: الأولى للسادس وأول إعدادي، والثانية لثاني وثالث إعدادي
+  const SLOT_ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
+  const BREAKS = new Set(['B', 'B1', 'B2']);
+  const TEACH_SLOTS = SLOT_ORDER.filter(s => !BREAKS.has(s));
+  const SLOT_NAME = { '1': 'الأولى', '2': 'الثانية', '3': 'الثالثة', 'B': 'الفسحة', 'B1': 'الفسحة الأولى', 'B2': 'الفسحة الثانية', '4': 'الرابعة', '5': 'الخامسة', '6': 'السادسة', '7': 'السابعة' };
+  // التوقيت بالدقائق: الحصة الثالثة تختلف حسب المرحلة
+  // ثاني وثالث إعدادي: 8:55–9:40 ثم الفسحة الثانية 9:40–10:10
+  // السادس وأول إعدادي: الفسحة الأولى 8:55–9:25 ثم الحصة 9:25–10:10
+  const TIMES = { '1': [445, 490], '2': [490, 535], 'B1': [535, 565], 'B2': [580, 610], 'B': [535, 610], '4': [610, 655], '5': [655, 700], '6': [700, 745], '7': [745, 790] };
+  const EARLY3 = new Set(['ع2', 'ع3']);
+  const ivOf = (s, code) => {
+    if (s !== '3') return TIMES[s] || [0, 0];
+    const gs = (code || '').split(' / ').filter(Boolean).map(c => c.slice(1));
+    if (!gs.length) return [535, 610];
+    const early = gs.some(g => EARLY3.has(g)), late = gs.some(g => !EARLY3.has(g));
+    return early && late ? [535, 610] : early ? [535, 580] : [565, 610];
+  };
+  const startOf = (s, latest) => s === '3' ? (latest ? 565 : 535) : (TIMES[s] || [0])[0];
+  const overlap = (a, b) => a[0] < b[1] && b[0] < a[1];
+  const hm = m => `${Math.floor(m / 60) > 12 ? Math.floor(m / 60) - 12 : Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+  // اسم الحصة مع وقتها لما يكون مختلف (الثالثة والفسحتين)
+  const slotLabel = (s, code) => {
+    if (s !== '3' && s !== 'B1' && s !== 'B2') return SLOT_NAME[s] || s;
+    const iv = ivOf(s, code);
+    return `${SLOT_NAME[s]} <small class="tm"><bdi dir="ltr">${hm(iv[0])}–${hm(iv[1])}</bdi></small>`;
+  };
   const NON_TEACHING = new Set(['مراقبة', 'اجتماع القسم', 'اجتماع التحسين', 'مشرف متابع']);
   const STORE = 'ap-taameen-v1';
   const slotIdx = s => SLOT_ORDER.indexOf(s);
@@ -12,6 +35,20 @@
   const T = window.TIMETABLE.teachers;
   const byId = Object.fromEntries(T.map(t => [t.id, t]));
   const deptOrder = [...new Set(T.map(t => t.dept))];
+  // مراقبات الفسحتين من جدولها الجديد بدل مراقبة الفسحة القديمة
+  (() => {
+    const norm = s => s.replace(/^أ\.\s*/, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, '');
+    const byNorm = Object.fromEntries(T.map(t => [norm(t.name), t]));
+    T.forEach(t => Object.keys(t.cells).forEach(k => { if (k.endsWith('-B')) delete t.cells[k]; }));
+    const DU = window.DUTIES;
+    if (!DU) return;
+    DU.days.forEach((pair, d) => pair.forEach((names, bi) => names.forEach((n, pi) => {
+      const t = byNorm[norm(n)];
+      if (!t) { console.warn('اسم غير موجود في جدول المراقبات:', n); return; }
+      t.cells[`${d}-B${bi + 1}`] = { c: '', t: 'مراقبة', post: DU.posts[pi] };
+      if (!t.days.includes(d)) t.days.push(d);
+    })));
+  })();
   T.forEach(t => { t.teaching = Object.values(t.cells).filter(c => !NON_TEACHING.has(c.t)).length; });
 
   // ---------------- التخزين ----------------
@@ -72,7 +109,12 @@
       return mine.length === all.length ? GRADE_NAME(g) : `${GRADE_NAME(g).replace(' إعدادي', '')} ${mine.map(c => arNum(c[0])).join(' و')}`;
     }).filter(Boolean).join('، ');
   };
-  const supAllows = (id, code) => { const list = supOf(id); return !list.length || (!!code && code.split(' / ').every(c => list.includes(c))); };
+  const BREAK_GRADES = { B1: ['ب6', 'ع1'], B2: ['ع2', 'ع3'] };
+  const supAllows = (id, code, slot) => {
+    const list = supOf(id); if (!list.length) return true;
+    if (BREAK_GRADES[slot]) return list.some(c => BREAK_GRADES[slot].includes(c.slice(1)));  // مراقبة فسحة مرحلته
+    return !!code && code.split(' / ').every(c => list.includes(c));
+  };
   const emergencyList = () => (db.settings.emergency || '').split('\n').map(x => x.trim()).filter(Boolean);
 
   let toastTimer;
@@ -196,9 +238,9 @@
   function context(st = state, skipItem = null) {
     const d = D();
     const ov = new Map();   // "tid|slot" -> cell أو null
-    const out = new Map();  // tid -> Set(slots) خارج المدرسة (استئذان)
+    const out = new Map();  // tid -> [فترات] خارج المدرسة (استئذان)
     for (const sw of st.swaps) {
-      out.set(sw.a, new Set([...(out.get(sw.a) || []), ...sw.slots]));
+      out.set(sw.a, [...(out.get(sw.a) || []), winOf(sw)]);
       for (const it of sw.items) {
         if (it === skipItem || !it.b) continue;
         ov.set(`${sw.a}|${it.s}`, null);
@@ -208,9 +250,18 @@
       }
     }
     const cell = (tid, s) => { const k = `${tid}|${s}`; return ov.has(k) ? ov.get(k) : byId[tid].cells[`${d}-${s}`] || null; };
-    const isOut = (tid, s) => !!(out.get(tid) && out.get(tid).has(s));
+    const isOutIv = (tid, iv) => (out.get(tid) || []).some(w => overlap(w, iv));
+    // مشغول إذا عنده أي شي يتداخل وقته مع هالفترة
+    const busyIv = (tid, iv) => SLOT_ORDER.some(s => { const c = cell(tid, s); return c && overlap(ivOf(s, c.c), iv); });
     const absentSet = new Set(Object.keys(st.absent));
-    return { d, cell, isOut, absentSet };
+    return { d, cell, isOutIv, busyIv, absentSet };
+  }
+  // وقت خروج المستأذن [بداية، نهاية]
+  function winOf(sw) {
+    if (sw.win) return sw.win;
+    if (sw.mode === 'from' && sw.from) return [startOf(sw.from, false), sw.to && sw.to !== 'end' ? startOf(sw.to, true) : 9999];
+    const ivs = (sw.slots || []).map(s => TIMES[s] || ivOf(s, ''));
+    return ivs.length ? [Math.min(...ivs.map(x => x[0])), Math.max(...ivs.map(x => x[1]))] : [0, 0];
   }
   const dayCells = (ctx, tid) => SLOT_ORDER.map(s => ({ s, cell: ctx.cell(tid, s) })).filter(x => x.cell);
   const coverable = cell => !NON_TEACHING.has(cell.t) || (cell.t === 'مراقبة' && db.settings.coverBreak);
@@ -242,12 +293,15 @@
     const opts = [];
     for (const b of T) {
       if (b.id === a || !presentOn(b, ctx.d) || ctx.absentSet.has(b.id)) continue;
-      if (ctx.cell(b.id, it.s) || ctx.isOut(b.id, it.s)) continue; // البديل لازم يكون فاضي وقت حصة صاحب الطلب
+      const ivS = ivOf(it.s, it.c);
+      if (ctx.busyIv(b.id, ivS) || ctx.isOutIv(b.id, ivS)) continue; // البديل لازم يكون فاضي وقت حصة صاحب الطلب
       for (const s2 of TEACH_SLOTS) {
-        if (s2 === it.s || sw.slots.includes(s2)) continue;
+        if (s2 === it.s) continue;
         const bc = ctx.cell(b.id, s2);
         if (!bc || bc.swap || NON_TEACHING.has(bc.t) || bc.c !== it.c) continue;
-        if (ctx.cell(a, s2) || ctx.isOut(b.id, s2)) continue;     // صاحب الطلب فاضي وقتها
+        const iv2 = ivOf(s2, it.c);
+        if (overlap(iv2, winOf(sw))) continue;                         // صاحب الطلب برا المدرسة وقتها
+        if (ctx.busyIv(a, iv2) || ctx.isOutIv(b.id, iv2)) continue;    // صاحب الطلب فاضي وقتها
         opts.push({ b: b.id, s2, t2: bc.t, covering: covering.has(b.id), key: [covering.has(b.id) ? 1 : 0, hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
       }
     }
@@ -272,11 +326,16 @@
   function needs(ctx) {
     const list = [];
     for (const [tid, slots] of Object.entries(state.absent)) {
-      for (const { s, cell } of dayCells(ctx, tid)) if (slots.includes(s) && coverable(cell)) list.push({ slot: s, c: cell.c, t: cell.t, absent: tid, kind: 'abs' });
+      for (const { s, cell } of dayCells(ctx, tid)) if (slots.includes(s) && coverable(cell)) list.push({ slot: s, c: cell.c, t: cell.post ? `مراقبة — ${cell.post}` : cell.t, absent: tid, kind: 'abs' });
     }
     for (const sw of state.swaps) {
       if (ctx.absentSet.has(sw.a)) continue;
       for (const it of sw.items) if (!it.b) list.push({ slot: it.s, c: it.c, t: it.t, absent: sw.a, kind: 'out' });
+      // مراقبة الفسحة اللي تصادف وقت خروجه
+      if (db.settings.coverBreak) for (const s of ['B1', 'B2']) {
+        const c = ctx.cell(sw.a, s);
+        if (c && c.t === 'مراقبة' && overlap(TIMES[s], winOf(sw))) list.push({ slot: s, c: '', t: c.post ? `مراقبة — ${c.post}` : c.t, absent: sw.a, kind: 'out' });
+      }
     }
     return list;
   }
@@ -286,25 +345,25 @@
     extra.forEach(x => teach.add(x)); teach.add(s);
     let best = 0, run = 0;
     for (const x of SLOT_ORDER) {
-      if (x === 'B') { run = 0; continue; }
+      if (BREAKS.has(x)) { run = 0; continue; }
       run = teach.has(x) ? run + 1 : 0; best = Math.max(best, run);
     }
     return best;
   }
 
   function candidates(row, rows, hist, ctx) {
-    const s = row.slot;
+    const s = row.slot, iv = ivOf(s, row.c);
     const absT = byId[row.absent];
-    const taken = new Set(rows.filter(r => r !== row && r.slot === s && r.sub).map(r => r.sub));
+    const taken = new Set(rows.filter(r => r !== row && r.sub && overlap(ivOf(r.slot, r.c), iv)).map(r => r.sub));
     const tc = {}, extra = {};
     rows.forEach(r => { if (r !== row && r.sub) { tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
-    const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOut(t.id, s) && !ctx.cell(t.id, s) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c));
+    const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOutIv(t.id, iv) && !ctx.busyIv(t.id, iv) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c, s));
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
-      const run = s === 'B' ? 0 : runAfter(ctx, t.id, s, (extra[t.id] || []).filter(x => x !== 'B'));
+      const run = BREAKS.has(s) ? 0 : runAfter(ctx, t.id, s, (extra[t.id] || []).filter(x => !BREAKS.has(x)));
       const over = n >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 3 ? 1 : 0;
@@ -313,7 +372,8 @@
   }
 
   function emergencyFree(row, rows) {
-    const taken = new Set(rows.filter(r => r !== row && r.slot === row.slot && r.sub).map(r => r.sub));
+    const iv = ivOf(row.slot, row.c);
+    const taken = new Set(rows.filter(r => r !== row && r.sub && overlap(ivOf(r.slot, r.c), iv)).map(r => r.sub));
     return emergencyList().map(n => 'E:' + n).filter(id => !taken.has(id));
   }
   // يختار للحصة الأنسب، وإذا ما فيه أحد يروح للطوارئ
@@ -398,9 +458,9 @@
     $('#absSlots').innerHTML = ids.map(id => {
       const t = byId[id];
       const pills = dayCells(ctx, id).map(({ s, cell }) => {
-        if (!coverable(cell)) return `<span class="pill na" title="لا تحتاج تأمين">${SLOT_NAME[s]}<small>${esc(cell.t)}</small></span>`;
+        if (!coverable(cell)) return `<span class="pill na" title="لا تحتاج تأمين">${SLOT_NAME[s]}<small>${esc(cell.post || cell.t)}</small></span>`;
         const on = state.absent[id].includes(s);
-        return `<button class="pill ${on ? 'on' : ''}" data-pill="${id}" data-s="${s}" aria-pressed="${on}">${SLOT_NAME[s]}<small>${cell.c ? codeHTML(cell.c) + ' ' : ''}${esc(cell.t)}</small></button>`;
+        return `<button class="pill ${on ? 'on' : ''}" data-pill="${id}" data-s="${s}" aria-pressed="${on}">${SLOT_NAME[s]}<small>${cell.c ? codeHTML(cell.c) + ' ' : ''}${esc(cell.post || cell.t)}</small></button>`;
       }).join('');
       return `<div class="abs-block"><header><div><b>${esc(t.name)}</b> <small>· ${esc(t.dept)}</small></div><div><button class="link" data-all="${id}">كل الحصص</button><button class="link" data-rm="${id}">إلغاء الغياب</button></div></header><div class="slot-pills">${pills || '<span class="muted">ما عنده حصص اليوم</span>'}</div></div>`;
     }).join('');
@@ -438,7 +498,7 @@
         const refusedTxt = (r.refused || []).length ? ` <small class="muted">اعتذر: ${esc(r.refused.map(nm).join('، '))}</small>` : '';
         const refuseBtn = r.sub && !isE(r.sub) ? ` <button class="link" data-refuse="${i}">اعتذر</button>` : '';
         return `<tr class="${r.sub ? '' : 'missing'}">
-          <td class="per" data-l="الحصة">${SLOT_NAME[r.slot]}</td>
+          <td class="per" data-l="الحصة">${slotLabel(r.slot, r.c)}</td>
           <td data-l="الصف">${codeHTML(r.c)}</td>
           <td data-l="المادة">${esc(r.t)}</td>
           <td data-l="المؤمِّن"><select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="طوارئ">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
@@ -483,15 +543,13 @@
   }
   // كل الأوقات اللي يكون فيها برا المدرسة (مع الفسحة)
   function swWindow() {
-    const fi = slotIdx(swDraft.from || '7');
-    const ti = swDraft.to === 'end' ? SLOT_ORDER.length : slotIdx(swDraft.to);
-    return SLOT_ORDER.filter(s => slotIdx(s) >= fi && slotIdx(s) < ti);
+    return [startOf(swDraft.from || '7', false), swDraft.to === 'end' ? 9999 : startOf(swDraft.to, true)];
   }
   // حصصه التدريسية داخل وقت الخروج
   function swSlots() {
     if (!swDraft.a) return [];
     const win = swWindow();
-    return dayCells(context(), swDraft.a).filter(x => !NON_TEACHING.has(x.cell.t) && win.includes(x.s)).map(x => x.s);
+    return dayCells(context(), swDraft.a).filter(x => !NON_TEACHING.has(x.cell.t) && overlap(ivOf(x.s, x.cell.c), win)).map(x => x.s);
   }
   const swWhen = sw => sw.mode === 'pick' ? 'حصص محددة'
     : `يطلع من الحصة ${SLOT_NAME[sw.from]}${sw.to && sw.to !== 'end' ? ` ويرجع الحصة ${SLOT_NAME[sw.to]}` : ' لنهاية الدوام'}`;
@@ -504,8 +562,8 @@
       const rows = sw.items.map((it, ii) => {
         const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}${o.covering ? ' (عنده تأمين اليوم)' : ''}</option>`).join('');
         const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="">— للتأمين —</option>${opts}</select>`;
-        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${SLOT_NAME[it.s]}</td><td data-l="المعلم">${it.b ? '<span class="role-tag">البديل</span>' : ''}${sel}</td></tr>`;
-        const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${SLOT_NAME[it.s2]}</td><td data-l="المعلم"><span class="role-tag">المستأذن</span><b>${esc(nm(sw.a))}</b></td></tr>` : '';
+        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${slotLabel(it.s, it.c)}</td><td data-l="المعلم">${it.b ? '<span class="role-tag">البديل</span>' : ''}${sel}</td></tr>`;
+        const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${slotLabel(it.s2, it.c)}</td><td data-l="المعلم"><span class="role-tag">المستأذن</span><b>${esc(nm(sw.a))}</b></td></tr>` : '';
         return first + second;
       }).join('');
       return `<div class="card"><div class="card-head"><h2>${esc(nm(sw.a))}</h2><button class="btn danger" data-swdel="${si}">إلغاء الطلب</button></div>
@@ -527,7 +585,7 @@
     if (kind === 'cover') {
       let n = 0;
       const tbody = groupRows(data.rows || []).map(g => `<tr class="ps-grp"><td colspan="6">${g.kind === 'out' ? 'المعلم المستأذن' : 'المعلم الغائب'}: <b>${esc(nm(g.absent))}</b> — ${esc(byId[g.absent].dept)}</td></tr>` +
-        g.rows.map(({ r }) => `<tr><td>${arNum(++n)}</td><td>${SLOT_NAME[r.slot]}</td><td>${r.c ? codeHTML(r.c) : '—'}</td><td>${esc(r.t)}</td>
+        g.rows.map(({ r }) => `<tr><td>${arNum(++n)}</td><td>${slotLabel(r.slot, r.c)}</td><td>${r.c ? codeHTML(r.c) : '—'}</td><td>${esc(r.t)}</td>
           <td class="nm">${r.sub ? esc(nm(r.sub)) : '................................'}</td><td class="sig"></td></tr>`).join('')).join('');
       body = `<table class="ps-table">
         <thead><tr><th style="width:6%">م</th><th style="width:11%">الحصة</th><th style="width:10%">الصف</th><th style="width:15%">المادة</th><th>المعلم المؤمِّن</th><th style="width:26%">التوقيع بالعلم</th></tr></thead>
@@ -539,8 +597,8 @@
         const its = sw.items.filter(it => it.b);
         const n = its.length;
         return its.map((it, i) => `<tr${i === 0 ? ' class="pair"' : ''}><td>${arNum(++m)}</td>
-          ${i === 0 ? `<td class="nm" rowspan="${n}">${esc(nm(sw.a))}</td>` : ''}<td>${codeHTML(it.c)}</td><td class="per-cell">${SLOT_NAME[it.s2]}</td>${i === 0 ? `<td class="sig" rowspan="${n}"></td>` : ''}
-          <td class="nm side">${esc(nm(it.b))}</td><td>${codeHTML(it.c)}</td><td class="per-cell">${SLOT_NAME[it.s]}</td><td class="sig"></td></tr>`).join('');
+          ${i === 0 ? `<td class="nm" rowspan="${n}">${esc(nm(sw.a))}</td>` : ''}<td>${codeHTML(it.c)}</td><td class="per-cell">${slotLabel(it.s2, it.c)}</td>${i === 0 ? `<td class="sig" rowspan="${n}"></td>` : ''}
+          <td class="nm side">${esc(nm(it.b))}</td><td>${codeHTML(it.c)}</td><td class="per-cell">${slotLabel(it.s, it.c)}</td><td class="sig"></td></tr>`).join('');
       }).join('');
       body = `<table class="ps-table">
         <thead><tr><th rowspan="2" style="width:5%">م</th><th colspan="4" class="side-h">المعلم المستأذن</th><th colspan="4" class="side-h side">المعلم البديل</th></tr>
@@ -691,8 +749,8 @@
     const head = SLOT_ORDER.map(s => `<th>${SLOT_NAME[s]}</th>`).join('');
     const body = DAYS.map((n, d) => `<tr><th>${n}</th>${SLOT_ORDER.map(s => {
       const c = t.cells[`${d}-${s}`];
-      if (!c) return `<td class="${s === 'B' ? 'brk' : ''}"></td>`;
-      return `<td class="${s === 'B' ? 'brk' : ''} ${NON_TEACHING.has(c.t) ? 'meet' : ''}">${c.c ? codeHTML(c.c) : ''}<small>${esc(c.t)}</small></td>`;
+      if (!c) return `<td class="${BREAKS.has(s) ? 'brk' : ''}"></td>`;
+      return `<td class="${BREAKS.has(s) ? 'brk' : ''} ${NON_TEACHING.has(c.t) ? 'meet' : ''}">${c.c ? codeHTML(c.c) : ''}<small>${esc(c.post || c.t)}</small></td>`;
     }).join('')}</tr>`).join('');
     return `<div class="tt table-wrap"><table><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
   }
@@ -774,7 +832,7 @@
     const slots = swSlots(); if (!swDraft.a || !slots.length) return;
     const ctx = context();
     const items = slots.map(s => { const c = ctx.cell(swDraft.a, s); return { s, c: c.c, t: c.t, b: '', s2: '', t2: '' }; });
-    state.swaps.push({ a: swDraft.a, mode: 'from', from: swDraft.from, to: swDraft.to, slots: swWindow(), reason: $('#swReason').value.trim(), items });
+    state.swaps.push({ a: swDraft.a, mode: 'from', from: swDraft.from, to: swDraft.to, win: swWindow(), reason: $('#swReason').value.trim(), items });
     swDraft = newDraft(); $('#swReason').value = '';
     afterChange();
     const sw = state.swaps[state.swaps.length - 1];
