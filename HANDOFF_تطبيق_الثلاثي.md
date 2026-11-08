@@ -33,7 +33,17 @@
 - المزامنة: `sync.js`. إذا `firebase-config.js` فيه إعدادات ← Firebase Firestore، وإذا null ← وضع تجربة (localStorage + BroadcastChannel بين تبويبات نفس المتصفح).
 - بيانات Firestore: `people/{key}`، `assign/{date_kind_absent_slot}`، `explain/{auto}`، `msgs/{auto}`.
 
-## الخطوة الجاية (عند أ. طلال)
+## الحالة الحالية (8 نوفمبر 2026) — منشور وشغّال
+- الرابط: https://ap-taameen.web.app (الإداري، برمز دخول في `gate.js`، والرمز عند أ. طلال) و`/app/?k=…` للمعلمين.
+- Firebase مشروع `ap-taameen` (Firestore eur3، القواعد = `firestore.rules`)، و`firebase-config.js` مربوط.
+- النشر تلقائي: أي push على الفرع `claude/beautiful-planck-y0yu0f` أو `main` ينشر عبر `.github/workflows/deploy.yml` (Secret اسمه `FIREBASE_SERVICE_ACCOUNT`، وحساب الخدمة عنده أدوار Service Usage Consumer وFirebase Hosting Admin وAPI Keys Viewer).
+- مهام تجربة قديمة ليوم 2026-11-09 حالتها `cancelled` (ما تطلع لأحد).
+
+## المرحلة الثانية (مقترحة)
+1. تسجيل دخول حقيقي (Firebase Auth) وقواعد تخلي كل معلم يقرأ مهامه فقط.
+2. تنبيهات وهو مقفّل (Firebase Cloud Messaging).
+
+## الخطوة الجاية (قديم — انعمل)
 1. ينشئ مشروع Firebase مجاني ← Firestore ← تطبيق ويب ← يلصق `firebaseConfig` (نحطها في `firebase-config.js`).
 2. الاستضافة: Firebase Hosting (`firebase.json` جاهز) أو أي استضافة ثابتة.
 3. قواعد `firestore.rules` حماية أساسية. **صراحة:** الحماية الكاملة تحتاج تسجيل دخول، وهي مرحلة ثانية.
