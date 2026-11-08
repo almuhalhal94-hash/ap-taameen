@@ -11,17 +11,17 @@ body{margin:0;width:1080px;height:1350px;font-family:R,sans-serif;background:rad
 h1{font-family:Am,serif;font-size:70px;margin:10px 0 0;color:#f6d690;line-height:1.2}
 h2{margin:0;font-size:34px;font-weight:400;color:#f3e3d0}
 .qr{background:#fff;border-radius:36px;padding:34px;margin-top:30px;box-shadow:0 20px 50px rgba(0,0,0,.45);text-align:center}
-.qr img{width:420px;height:420px;display:block}.qr b{display:block;direction:ltr;color:#7a0a16;font-size:32px;margin-top:10px}
-ol{list-style:none;padding:0;margin:34px 0 0;display:flex;gap:18px}
+.qr img{width:380px;height:380px;display:block}.qr b{display:block;direction:ltr;color:#7a0a16;font-size:32px;margin-top:10px}
+ol{list-style:none;padding:0;margin:26px 0 0;display:flex;gap:18px}
 li{background:rgba(255,255,255,.1);border:1px solid rgba(246,214,144,.5);border-radius:20px;padding:14px 20px;font-size:25px;max-width:290px;text-align:center}
 li i{font-style:normal;display:block;color:#f6d690;font-weight:700;font-size:30px}
-.nt{margin-top:24px;font-size:22px;color:#f3e3d0}
-.prep{margin-top:auto;width:100%;border-top:3px solid #e2b45a;background:rgba(0,0,0,.25);text-align:center;padding:22px 0 26px;font-size:24px;color:#f3e3d0}.prep b{display:block;font-family:Am,serif;font-size:44px;color:#f6d690;line-height:1.3}</style></head><body>
+.nt{margin:16px 0;font-size:22px;color:#f3e3d0}
+.prep{margin-top:auto;width:100%;border-top:3px solid #e2b45a;background:rgba(0,0,0,.28);display:grid;grid-template-columns:1fr 1.3fr 1fr;padding:18px 30px 22px;box-sizing:border-box;font-size:22px;color:#f3e3d0;text-align:center}.prep>div+div{border-inline-start:1px solid rgba(246,214,144,.35)}.prep b{display:block;font-family:Am,serif;font-size:34px;color:#f6d690;line-height:1.35}</style></head><body>
 <div class="hd"><img src="${b64(A + '/assets/header.jpg', 'image/jpeg')}"></div>
 <img class="ic" src="${b64(A + '/app/icon-192.png', 'image/png')}">
 <h1>${title}</h1><h2>${sub}</h2>
 <div class="qr"><img src="${b64(d + '/' + qr, 'image/svg+xml')}"><b>${url}</b></div>
-<ol>${steps.map((s, i) => `<li><i>${'١٢٣'[i]}</i>${s}</li>`).join('')}</ol>${note ? `<p class="nt">${note}</p>` : ''}<div class="prep">إعداد<b>أ. طلال سعود</b></div></body></html>`;
+<ol>${steps.map((s, i) => `<li><i>${'١٢٣'[i]}</i>${s}</li>`).join('')}</ol>${note ? `<p class="nt">${note}</p>` : ''}<div class="prep"><div>إعداد<b>أ. طلال سعود</b></div><div>المديران المساعدان<b>أ. أنور الجابري</b><b>أ. أحمد بوجيري</b></div><div>مدير المدرسة<b>أ. خالد السيد</b></div></div></body></html>`;
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 2 });
   for (const [f, h] of [
