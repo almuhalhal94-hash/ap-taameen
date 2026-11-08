@@ -394,3 +394,4 @@ a.btn{text-decoration:none}
 .rhist .n{min-width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.08);display:inline-grid;place-items:center;font-size:.7rem}
 .rhist .rnote.old{text-decoration:line-through;opacity:.55}
 .rhist .rnote.last{font-weight:700}
+.al-req{border-inline-start-color:#2563a8;background:linear-gradient(90deg,rgba(37,99,168,.07),transparent)}

@@ -994,6 +994,33 @@
     saveSettings() { persist(); cloudConfig(); },
     // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
     ranked(row) { const cs = candidates(row, state.rows, historyCounts(date), context()); return [...cs.filter(c => !c.over), ...cs.filter(c => c.over)].map(c => c.t.id); },
+    // طلب تبديل من معلم (من التطبيق): يرتّبه تلقائيًا بنفس قواعد التبديل، ويفضّل الزميل المقترح إن أمكن
+    swapRequest(iso, a, slots, reason, prefer) {
+      if (iso !== date) { $('#dateInput').value = iso; swDraft = newDraft(); loadDate(iso); }
+      if (D() === -1) return { err: 'هذا اليوم ما فيه دوام.' };
+      if (state.swaps.some(x => x.a === a)) return { err: `${nm(a)} عنده تبديل مسجّل في هذا اليوم — عدّله من «التبديل والاستئذان».` };
+      const ctx = context();
+      if (ctx.absentSet.has(a)) return { err: `${nm(a)} مسجّل غائب في هذا اليوم.` };
+      const own = slots.filter(x => { const c = ctx.cell(a, x); return c && !NON_TEACHING.has(c.t); });
+      if (!own.length) return { err: `${nm(a)} ما عنده حصص تدريس في الحصص المطلوبة (${slots.map(x => SLOT_NAME[x]).join('، ')}).` };
+      const items = own.map(x => { const c = ctx.cell(a, x); return { s: x, c: c.c, t: c.t, b: '', s2: '', t2: '' }; });
+      const sw = { a, mode: 'pick', slots: own, reason: 'طلب المعلم: ' + reason, items, req: true };
+      state.swaps.push(sw);
+      const hist = historyCounts(date), pref = (prefer || '').replace(/^أ\.?\s*/, '').trim();
+      const used = new Set();
+      for (const it of items) {
+        const opts = swapOptions(sw, it, hist).filter(o => !o.covering && !used.has(o.b + '|' + o.s2));
+        const best = (pref && opts.find(o => nm(o.b).includes(pref))) || opts[0];
+        if (best) { Object.assign(it, { b: best.b, s2: best.s2, t2: best.t2, m: true, none: false }); used.add(best.b + '|' + best.s2); }
+      }
+      afterChange();
+      const res = sw.items.map(it => it.b
+        ? { ok: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}) يدخلها ${nm(it.b)}، وتدخل أنت حصته ${SLOT_NAME[it.s2]}` }
+        : { ok: false, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}): ما فيه زميل متاح للتبديل، وتُغطّى بالتأمين` });
+      const skipped = slots.filter(x => !own.includes(x)).map(x => SLOT_NAME[x]);
+      return { result: res, skipped };
+    },
+    openSwap() { document.querySelector('.tab[data-tab="swaps"]').click(); },
     swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },
     // يطبّق رد معلم: اعتذار (يضاف للمعتذرين) والبديل الجديد اللي اختاره التطبيق
     applyRefusal(iso, key, refused, next) {

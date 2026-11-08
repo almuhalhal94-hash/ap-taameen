@@ -76,7 +76,7 @@
     <div class="sheet-btns"><button class="b-ghost" data-x="out">تسجيل الخروج</button><button class="b-ok" data-x="close">رجوع</button></div>`, { out: () => { store.del('apt-key'); location.reload(); } }));
 
   // ---------- التنقل ----------
-  let cur = '', mine = [], refusedByMe = [], released = [], supL = [], exps = [], msgs = [];
+  let cur = '', mine = [], refusedByMe = [], released = [], supL = [], exps = [], msgs = [], reqs = [];
   function show(v) {
     showView(v); cur = v;
     document.querySelectorAll('#bar button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -409,7 +409,12 @@
   });
 
   // ---------- المحادثة ----------
-  S.watch('msgs', ['tid', '==', ME], list => {
+  S.watch('msgs', ['tid', '==', ME], all => {
+    const list = all.filter(m => !m.type);
+    reqs = all.filter(m => m.type === 'req' && m.status !== 'cancelled').sort((a, b) => b.at - a.at);
+    reqs.filter(q => q.status === 'approved').forEach(q => alertNew('q:' + q.id + ':ok', '✓ وافقت الإدارة على طلب التبديل', `${reqDay(q)} — ${(q.result || []).map(x => x.txt).join('، ') || 'تم الترتيب'}`));
+    reqs.filter(q => q.status === 'declined').forEach(q => alertNew('q:' + q.id + ':no', 'طلب التبديل ما اعتُمد', `${reqDay(q)}${q.adminNote ? ' — ' + q.adminNote : ''}`));
+    renderReqs();
     msgs = list.sort((a, b) => a.at - b.at);
     msgs.filter(m => m.from === 'admin').forEach(m => alertNew('m:' + m.id, '✉ رسالة من الإدارة', m.text.slice(0, 120)));
     setNb('#nbChat', msgs.filter(m => m.from === 'admin' && !m.readT).length);
@@ -426,6 +431,52 @@
     const t = $('#chatText').value.trim(); if (!t) return;
     $('#chatText').value = ''; SND('send');
     await S.add('msgs', { tid: ME, name: me.name, from: 'teacher', role: ROLE, text: t, at: now(), readA: false, readT: true });
+  });
+
+  // ---------- طلب تبديل حصة ----------
+  function reqDay(q) { return `${weekdayAr(q.date)} ${q.date.split('-').reverse().join('-')}`; }
+  function weekdayAr(iso) { const [y, m, d] = iso.split('-').map(Number); return ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][new Date(y, m - 1, d).getDay()]; }
+  function renderReqs() {
+    const ST = { pending: ['wait', 'بانتظار رد الإدارة'], approved: ['ok', 'تمت الموافقة ✓'], declined: ['bad', 'ما اعتُمد'] };
+    $('#reqList').innerHTML = reqs.filter(q => q.date >= TODAY).map(q => {
+      const st = ST[q.status] || ST.pending;
+      const res = q.status === 'approved' && (q.result || []).length ? `<div class="s rq-res">${q.result.map(x => `<span class="${x.ok ? '' : 'rq-warn'}">${x.ok ? '⇄' : '⚠'} ${esc(x.txt)}</span>`).join('<br>')}</div>` : '';
+      return `<div class="item rq rq-${st[0]}"><span class="dot ${st[0] === 'bad' ? 'bad' : ''}"></span><div class="grow"><div class="t">طلب تبديل — ${esc(reqDay(q))}</div>
+        <div class="s">الحصص: ${q.slots.map(perName).join('، ')} · السبب: ${esc(q.reason)}</div>${res}${q.adminNote ? `<div class="s rq-note">الإدارة: ${esc(q.adminNote)}</div>` : ''}</div>
+        <div class="side"><span class="tag ${st[0] === 'ok' ? 'ok' : ''}">${st[1]}</span>${q.status === 'pending' ? `<button class="mini" data-rq-cancel="${q.id}">إلغاء الطلب</button>` : ''}</div></div>`;
+    }).join('');
+  }
+  const PER = { 1: 'الأولى', 2: 'الثانية', 3: 'الثالثة', 4: 'الرابعة', 5: 'الخامسة', 6: 'السادسة', 7: 'السابعة' };
+  const perName = s => PER[s] || s;
+  $('#btnReq').addEventListener('click', async () => {
+    SND('tap');
+    const tm = new Date(); tm.setDate(tm.getDate() + 1);
+    const def = tm.getDay() === 5 ? isoOf(new Date(tm.getTime() + 2 * 864e5)) : tm.getDay() === 6 ? isoOf(new Date(tm.getTime() + 864e5)) : isoOf(tm);
+    const picked = new Set();
+    const v = await sheet(`<div class="sh-ic">⇄</div><h3>طلب تبديل حصة</h3>
+      <p class="sh-sum">اختر اليوم والحصص اللي تبي تبدّلها. الإدارة ترتّب لك زميلًا يدرّس <b>نفس الصف</b>: يدخل حصتك، وتدخل أنت حصته في وقت ثاني من نفس اليوم.</p>
+      <p class="lbl">اليوم <span class="req">*</span></p><input type="date" id="rqDate" class="rq-in" min="${TODAY}" value="${def}">
+      <p class="lbl">الحصص <span class="req">*</span></p><div class="reasons rq-per" id="rqPer">${Object.entries(PER).map(([k, n]) => `<button type="button" data-p="${k}">${n}</button>`).join('')}</div>
+      <p class="lbl">السبب <span class="req">*</span></p><textarea id="rqWhy" rows="2" placeholder="مثال: موعد رسمي، ظرف عائلي…"></textarea>
+      <p class="lbl">زميل تقترحه <small class="muted">(اختياري)</small></p><input id="rqWho" class="rq-in" placeholder="اسم الزميل إن اتفقت معه">
+      <p class="err" id="rqErr"></p>
+      <div class="sheet-btns"><button class="b-ok" data-x="go">إرسال الطلب للإدارة</button><button class="b-ghost" data-x="close">رجوع</button></div>`, {
+      go: () => {
+        const date = $('#rqDate').value, reason = $('#rqWhy').value.trim();
+        const err = !date || date < TODAY ? 'اختر يومًا من اليوم فما بعد.' : !picked.size ? 'اختر حصة وحدة على الأقل.' : reason.length < 3 ? 'اكتب سبب الطلب.' : '';
+        if (err) { $('#rqErr').textContent = err; buzz(30); return false; }
+        return { date, reason, slots: [...picked].sort(), prefer: $('#rqWho').value.trim() };
+      }
+    }, () => {
+      $('#rqPer').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; SND('tap'); picked.has(b.dataset.p) ? picked.delete(b.dataset.p) : picked.add(b.dataset.p); b.classList.toggle('on', picked.has(b.dataset.p)); $('#rqErr').textContent = ''; };
+    });
+    if (!v) return;
+    await S.add('msgs', { type: 'req', tid: ME, name: me.name, from: 'teacher', ...v, status: 'pending', at: now(), readA: false, readT: true });
+    SND('send'); buzz(20); toast('انرسل طلبك للمدير المساعد');
+  });
+  $('#reqList').addEventListener('click', async e => {
+    const c = e.target.closest('[data-rq-cancel]'); if (!c) return;
+    await S.set('msgs/' + c.dataset.rqCancel, { status: 'cancelled' }); toast('أُلغي الطلب');
   });
 
   show(TEACH ? 'tasks' : 'sup');

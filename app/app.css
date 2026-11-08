@@ -228,3 +228,15 @@ main{flex:1;overflow-x:clip;padding:4px 16px calc(96px + var(--safe-b))}
 .lead b{color:var(--gold2)}
 .anote{margin-top:10px;font-size:.82rem;color:var(--gold2);background:rgba(226,180,90,.08);border:1px solid rgba(226,180,90,.35);border-radius:10px;padding:6px 10px;text-align:center}
 .wait-t{font-size:.72rem;color:var(--gold2)}
+
+/* طلب تبديل */
+.req-btn{display:flex;align-items:center;gap:12px;width:100%;margin:18px 0 8px;padding:13px 14px;border-radius:18px;border:1px dashed rgba(226,180,90,.55);background:linear-gradient(135deg,rgba(226,180,90,.12),rgba(226,180,90,.04));color:var(--ink);font:inherit;text-align:right;cursor:pointer}
+.req-btn i{font-style:normal;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#e2b45a;color:#2b0408;font-size:1.25rem;font-weight:700;flex:none}
+.req-btn b{display:block;color:#f6d690}.req-btn small{color:var(--muted);font-size:.8rem}
+.req-btn:active{transform:scale(.98)}
+.rq-in{width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--ink);font:inherit;color-scheme:dark}
+.rq-per{display:grid!important;grid-template-columns:repeat(4,1fr);gap:6px}
+.rq-per button{text-align:center!important;padding:9px 4px!important}
+.item.rq-ok{border-color:rgba(31,157,85,.5)}.item.rq-bad{border-color:rgba(198,40,40,.45)}.item.rq-wait{border-color:rgba(226,180,90,.45)}
+.rq-res{color:#7ee2a8!important}.rq-note{color:#f6d690!important}
+.rq-warn{color:#f0a35c}

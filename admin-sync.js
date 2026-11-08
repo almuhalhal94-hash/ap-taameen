@@ -7,7 +7,7 @@
   const esc = A.esc;
   const S = await window.Sync.ready;
   const DEMO = S.mode === 'demo';
-  let docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false;
+  let docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false, reqs = [], reqsReady = false;
   const ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
   const now = () => Date.now();
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل' };
@@ -369,7 +369,59 @@
 
   // ---------------- المحادثات ----------------
   let openT = '';
-  S.watch('msgs', null, list => { msgs = list.sort((a, b) => a.at - b.at); renderPeople(); renderThread(); badge(); });
+  S.watch('msgs', null, all => {
+    const nq = all.filter(m => m.type === 'req' && m.status !== 'cancelled').sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1) || b.at - a.at);
+    if (reqsReady) nq.filter(q => q.status === 'pending' && !reqs.some(o => o.id === q.id)).forEach(q => {
+      const t = `⇄ طلب تبديل من ${q.name}`, body = `${A.weekdayName(q.date)} ${A.fmtG(q.date)} — الحصص: ${q.slots.map(PER).join('، ')} — ${q.reason}`;
+      A.toast(t);
+      try { if ('Notification' in window && Notification.permission === 'granted') new Notification(t, { body, lang: 'ar', dir: 'rtl', tag: q.id }); } catch (e) { }
+    });
+    reqs = nq; reqsReady = true;
+    msgs = all.filter(m => !m.type).sort((a, b) => a.at - b.at); renderPeople(); renderThread(); renderReqs(); renderAlerts(); badge();
+  });
+  const PER = x => ({ 1: 'الأولى', 2: 'الثانية', 3: 'الثالثة', 4: 'الرابعة', 5: 'الخامسة', 6: 'السادسة', 7: 'السابعة' })[x] || x;
+  function reqCardHTML(q, compact) {
+    const when = `${esc(A.weekdayName(q.date))} ${esc(A.fmtG(q.date))}`;
+    const ST = { pending: ['act', '⏳ بانتظار قرارك'], approved: ['ok', '✓ تمت الموافقة'], declined: ['none', '✕ ما اعتُمد'] };
+    const st = ST[q.status] || ST.pending;
+    const res = (q.result || []).map(x => `<div class="rnote ${x.ok ? '' : 'adm'}">${x.ok ? '⇄' : '⚠'} ${esc(x.txt)}</div>`).join('');
+    const btns = q.status === 'pending' ? `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-rq-auto="${q.id}">⚡ تبديل تلقائي</button><button class="btn sm" data-rq-manual="${q.id}">✋ أرتبه بنفسي</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>` : '';
+    return `<div class="resp v-${st[0]}"><div class="vstate">${st[1]} — طلب تبديل من ${esc(q.name)}</div>
+      <div class="rw"><b>${when}</b> · الحصص: <b>${q.slots.map(PER).join('، ')}</b></div>
+      <div class="rw">السبب: «${esc(q.reason)}»${q.prefer ? ` · الزميل المقترح: <b>${esc(q.prefer)}</b>` : ''}</div>${res}${q.adminNote ? `<div class="rnote adm">ردّ الإدارة: ${esc(q.adminNote)}</div>` : ''}${compact ? '' : btns}</div>`;
+  }
+  function renderReqs() {
+    const list = reqs.filter(q => q.date >= A.isoOf(new Date()) || q.status === 'pending');
+    $('#reqAdmin').innerHTML = list.length ? list.map(q => reqCardHTML(q)).join('') : '<p class="muted">ما فيه طلبات تبديل.</p>';
+  }
+  async function reqAuto(id) {
+    const q = reqs.find(x => x.id === id); if (!q) return;
+    if (!(await A.ask(`ترتيب تبديل تلقائي لـ ${q.name} يوم ${A.weekdayName(q.date)} ${A.fmtG(q.date)} (الحصص: ${q.slots.map(PER).join('، ')})؟`, 'رتّب التبديل'))) return;
+    const r = A.swapRequest(q.date, q.tid, q.slots, q.reason, q.prefer);
+    if (r.err) { A.toast(r.err); await A.ask(r.err + '\n\nتقدر ترتبه بنفسك من «التبديل والاستئذان» أو تعتذر عن الطلب.', 'حسنًا'); return; }
+    const result = r.result.concat(r.skipped.length ? [{ ok: false, txt: `الحصص ${r.skipped.join('، ')}: ما عندك فيها حصة تدريس` }] : []);
+    await S.set('msgs/' + id, { status: 'approved', result, decidedAt: now(), readT: false });
+    if (!sentDays()[q.date]) await publish(false);
+    const ok = r.result.filter(x => x.ok).length;
+    A.toast(ok === r.result.length ? `تم التبديل ووصل الرد لـ ${q.name}` : `تبدّل ${ok} من ${r.result.length} — الباقي دخل جدول التأمين`);
+  }
+  async function reqManual(id) {
+    const q = reqs.find(x => x.id === id); if (!q) return;
+    if (q.date !== A.date) { $('#dateInput').value = q.date; $('#dateInput').dispatchEvent(new Event('change')); }
+    A.openSwap();
+    A.toast(`رتّب تبديل ${q.name} (${q.slots.map(PER).join('، ')}) من هنا، ثم ارجع واضغط «⚡ تبديل تلقائي» أو بلّغه من المحادثة`);
+  }
+  async function reqNo(id) {
+    const q = reqs.find(x => x.id === id); if (!q) return;
+    const note = prompt(`سبب عدم اعتماد طلب ${q.name} (يوصله على جواله):`, 'نعتذر، لا يتوفر بديل مناسب في هذا اليوم.');
+    if (note === null) return;
+    await S.set('msgs/' + id, { status: 'declined', adminNote: note.trim(), decidedAt: now(), readT: false });
+    A.toast('وصل الرد للمعلم');
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest('[data-rq-auto]'), m = e.target.closest('[data-rq-manual]'), n = e.target.closest('[data-rq-no]');
+    if (a) reqAuto(a.dataset.rqAuto); if (m) reqManual(m.dataset.rqManual); if (n) reqNo(n.dataset.rqNo);
+  });
   function renderPeople() {
     const last = {}, un = {};
     msgs.forEach(m => { last[m.tid] = m; if (m.from === 'teacher' && !m.readA) un[m.tid] = (un[m.tid] || 0) + 1; });
@@ -476,8 +528,11 @@
   });
   function renderAlerts() {
     const el = $('#appAlerts');
-    el.hidden = !alerts.length;
-    el.innerHTML = alerts.slice(0, 6).map(({ k, d, l }) => {
+    const pq = reqs.filter(q => q.status === 'pending');
+    el.hidden = !alerts.length && !pq.length;
+    el.innerHTML = pq.slice(0, 3).map(q => `<div class="al al-req"><div class="al-t">⇄ طلب تبديل من <b>${esc(q.name)}</b> — ${esc(A.weekdayName(q.date))} ${esc(A.fmtG(q.date))}، الحصص: ${q.slots.map(PER).join('، ')}</div>
+        <div class="al-n">السبب: «${esc(q.reason)}»${q.prefer ? ` · يقترح: ${esc(q.prefer)}` : ''}</div>
+        <div class="al-b"><button class="btn sm primary" data-rq-auto="${q.id}">⚡ تبديل تلقائي</button><button class="btn sm" data-rq-manual="${q.id}">✋ أرتبه بنفسي</button><button class="btn sm" data-rq-no="${q.id}">اعتذار</button></div></div>`).join('') + alerts.slice(0, 6).map(({ k, d, l }) => {
       const where = d.kind === 'duty' ? `${esc(d.slotName)} — ${esc(d.label.replace('مراقبة — ', ''))}` : `الحصة ${esc(d.slotName)}${d.c ? ' (' + code(d.c) + ')' : ''}`;
       const now2 = d.to ? `التكليف الحين عند <b>${esc(d.toName)}</b> ${d.status === 'accepted' ? '(استلم ✓)' : '(بانتظار استلامه)'}` : d.emg ? `تؤمّنها الإدارة: <b>${esc(d.emg)}</b>` : '<b class="bad-t">ما فيه مؤمّن — يحتاج قرارك</b>';
       return `<div class="al al-${l.act}"><div class="al-t">${ALERT[l.act][0]} ${ALERT[l.act][1]} <b>${esc(l.name)}</b> — ${KIND[d.kind]}، ${where}، ${esc(A.weekdayName(d.date))} ${esc(A.fmtG(d.date))}</div>
@@ -499,7 +554,7 @@
 
   // ---------------- الشارة ----------------
   function badge() {
-    const n = msgs.filter(m => m.from === 'teacher' && !m.readA).length + exps.filter(x => x.reply && !x.seenA).length + alerts.length;
+    const n = msgs.filter(m => m.from === 'teacher' && !m.readA).length + exps.filter(x => x.reply && !x.seenA).length + alerts.length + reqs.filter(q => q.status === 'pending').length;
     const el = $('#appBadge'); el.hidden = !n; el.textContent = n;
   }
 
