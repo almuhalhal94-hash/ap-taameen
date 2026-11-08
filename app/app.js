@@ -76,7 +76,7 @@
     <div class="sheet-btns"><button class="b-ghost" data-x="out">تسجيل الخروج</button><button class="b-ok" data-x="close">رجوع</button></div>`, { out: () => { store.del('apt-key'); location.reload(); } }));
 
   // ---------- التنقل ----------
-  let cur = '', mine = [], refusedByMe = [], supL = [], exps = [], msgs = [];
+  let cur = '', mine = [], refusedByMe = [], released = [], supL = [], exps = [], msgs = [];
   function show(v) {
     showView(v); cur = v;
     document.querySelectorAll('#bar button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -192,6 +192,9 @@
       return n;
     });
   }
+  // المكلّف الأول تراجع والزميل استلم: يصير طلب عند الإدارة، وهي تقرر
+  const askBack = id => tx(id, c => c && c.status === 'accepted' && (c.refused || []).includes(ME) && !c.returnReq
+    ? { ...c, returnReq: { tid: ME, name: me.name, at: now() }, log: logOf(c, 'askback'), updatedAt: now() } : null);
   // الرجوع عن الاعتذار: ممكن ما دام ما أحد استلمه بعدي
   function comeBack(id, act) {
     return tx(id, c => {
@@ -210,6 +213,11 @@
       mine = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD);
       mine.filter(d => d.status === 'pending').forEach(d => alertNew('a:' + d.id + ':' + (d.log || []).length, 'تكليف جديد: ' + KIND[d.kind], `${dayLabel(d)} — ${d.slotName}${d.c ? ' ' + d.c : ''}`));
       renderTasks();
+    });
+    S.watch('assign', ['released', 'array-contains', ME], list => {
+      released = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD);
+      released.filter(d => d.to !== ME).forEach(d => alertNew('r:' + d.id + ':' + d.to, 'أعفتك الإدارة من تكليف', `${dayLabel(d)} — ${d.slotName}`));
+      renderDone();
     });
     S.watch('assign', ['refused', 'array-contains', ME], list => { refusedByMe = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD); renderDone(); });
   }
@@ -230,6 +238,7 @@
     }
     const forTxt = d.kind === 'swap' ? `طلب تبديل من <b>${esc(d.absentName)}</b>` : `بدل <b>${esc(d.absentName)}</b> ${d.out ? '(مستأذن)' : '(غائب)'}`;
     return `<div class="card-top"><span class="kind">${KIND[d.kind]}</span><span class="official">تكليف رسمي</span></div>${body}
+      ${d.adminNote ? `<div class="anote">${esc(d.adminNote)}</div>` : ''}
       <div class="for">${forTxt}${d.auto ? '<span class="auto">تكليف محوّل لك</span>' : ''}</div>
       <div class="stamp yes">استلمت ✓</div><div class="stamp no">عذر رسمي</div>`;
   }
@@ -260,16 +269,28 @@
       ...acc.map(d => `<div class="item"><span class="dot ok"></span><div class="grow"><div class="t">${KIND[d.kind]} — ${esc(d.slotName)}</div><div class="s">${line(d)}</div></div>
         <div class="side"><span class="tag ok">استلمت ✓</span><button class="mini" data-withdraw="${d.id}">طرأ عذر؟</button></div></div>`),
       ...refusedByMe.map(d => {
-        const can = d.status !== 'accepted';
+        const can = d.status !== 'accepted', asked = d.returnReq && d.returnReq.tid === ME;
+        const act = can ? `<button class="mini go" data-back="${d.id}">تراجعت، سأحضر</button>`
+          : asked ? '<small class="wait-t">طلبك عند الإدارة</small>' : `<button class="mini" data-ask="${d.id}">استلمه زميل — اطلب الرجوع</button>`;
         return `<div class="item dim"><span class="dot bad"></span><div class="grow"><div class="t">${KIND[d.kind]} — ${esc(d.slotName)}</div><div class="s">${line(d)}</div></div>
-        <div class="side"><span class="tag">اعتذرت</span>${can ? `<button class="mini go" data-back="${d.id}">تراجعت، سأحضر</button>` : '<small class="muted">استلمه زميل</small>'}</div></div>`;
-      })
+        <div class="side"><span class="tag">اعتذرت</span>${act}</div></div>`;
+      }),
+      ...released.filter(d => d.to !== ME && !(d.refused || []).includes(ME)).map(d => `<div class="item dim"><span class="dot"></span><div class="grow"><div class="t">${KIND[d.kind]} — ${esc(d.slotName)}</div><div class="s">${line(d)}</div></div>
+        <div class="side"><span class="tag">أعفتك الإدارة</span><small class="muted">شكرًا لك</small></div></div>`)
     ];
     $('#doneHead').hidden = !rows.length;
     $('#doneList').innerHTML = rows.join('');
   }
   $('#doneList').addEventListener('click', async e => {
-    const w = e.target.closest('[data-withdraw]'), b = e.target.closest('[data-back]');
+    const w = e.target.closest('[data-withdraw]'), b = e.target.closest('[data-back]'), q = e.target.closest('[data-ask]');
+    if (q) {
+      const d = refusedByMe.find(x => x.id === q.dataset.ask); if (!d) return;
+      const ok = await sheet(`<div class="sh-ic ok">↺</div><h3>طلب الرجوع للتكليف</h3><p class="sh-sum">${dayLabel(d)} · ${summary(d)}</p><p class="muted">الزميل ${esc(d.toName)} استلمه بعد اعتذارك. أنت المكلّف الأول، ويوصل طلبك للمدير المساعد وهو يقرر.</p>
+        <div class="sheet-btns"><button class="b-ok" data-x="go">إرسال الطلب</button><button class="b-ghost" data-x="close">رجوع</button></div>`, { go: () => true });
+      if (!ok) return;
+      const r = await askBack(d.id); SND(r ? 'send' : 'reject'); toast(r ? 'انرسل طلبك للإدارة' : 'تعذّر الإرسال');
+      return;
+    }
     if (w) {
       const d = mine.find(x => x.id === w.dataset.withdraw); if (!d) return;
       const why = await askExcuse(d, true); if (!why) return;
@@ -282,7 +303,8 @@
         <div class="sheet-btns"><button class="b-ok" data-x="go">نعم، سأحضر</button><button class="b-ghost" data-x="close">رجوع</button></div>`, { go: () => true });
       if (!ok) return;
       const r = await comeBack(d.id, 'returned');
-      SND(r ? 'accept' : 'reject'); toast(r ? 'رجع لك التكليف ✓ — شكرًا لك' : 'ما يمدي — الزميل استلمه');
+      if (!r) { const a = await askBack(d.id); SND(a ? 'send' : 'reject'); toast(a ? 'الزميل استلمه — انرسل طلب رجوعك للإدارة' : 'تعذّر الإرسال'); return; }
+      SND('accept'); toast('رجع لك التكليف ✓ — شكرًا لك');
     }
   });
 
@@ -344,7 +366,7 @@
   }
   function renderSup() {
     const L = supL;
-    const n = { ok: L.filter(d => d.status === 'accepted').length, wait: L.filter(d => d.status === 'pending').length, none: L.filter(d => !d.to).length };
+    const n = { ok: L.filter(d => d.status === 'accepted' || d.status === 'emergency').length, wait: L.filter(d => d.status === 'pending').length, none: L.filter(d => !d.to && !d.emg).length };
     setNb('#nbSup', cur === 'sup' ? 0 : L.filter(d => d.status === 'accepted' && !seen.has('sv:' + d.id + ':' + d.to)).length);
     if (cur === 'sup') { L.forEach(d => seen.add('sv:' + d.id + ':' + d.to)); store.set(seenKey, JSON.stringify([...seen].slice(-300))); }
     $('#supSum').innerHTML = L.length ? `<span class="s-ok">${n.ok} مؤكد</span><span class="s-wait">${n.wait} بانتظار الاستلام</span>${n.none ? `<span class="s-bad">${n.none} تتابعه الإدارة</span>` : ''}` : '';
@@ -353,7 +375,7 @@
       const head = d.date !== lastDay ? `<div class="day-h">${esc(dayLabel(d))} · ${esc(gDate(d.date))}</div>` : ''; lastDay = d.date;
       const [dot, who, tag] = d.status === 'accepted' ? ['ok', esc(d.toName), '<span class="tag ok">مؤكد ✓</span>']
         : d.to ? ['wait', esc(d.toName), d.auto ? '<span class="tag auto">بديل محوّل</span>' : '<span class="tag">بانتظار الاستلام</span>']
-          : d.emg ? ['wait', esc(d.emg), '<span class="tag">طوارئ</span>'] : ['bad', 'الإدارة تتابع', ''];
+          : d.emg ? ['ok', '🛡 ' + esc(d.emg), '<span class="tag ok">الإدارة تؤمّن</span>'] : ['bad', 'الإدارة تتابع', ''];
       const what = d.kind === 'duty' ? '📍 ' + esc(d.label.replace('مراقبة — ', '')) : `${code(d.c)} · بدل ${esc(d.absentName)}`;
       return `${head}<div class="item"><span class="dot ${dot}"></span><div class="grow"><div class="t">${KIND[d.kind]} — ${esc(d.slotName)} <span class="tag" dir="ltr">${esc(d.time)}</span></div><div class="s">${what}</div><div class="s">المكلّف: <b class="ink">${who}</b> ${tag}</div></div></div>`;
     }).join('') || '<div class="empty"><div class="empty-ic">◉</div><b>ما فيه تأمين على صفوفك</b><p>أي تأمين أو مراقبة على صفوف إشرافك يطلع هنا مع حالته.</p></div>';

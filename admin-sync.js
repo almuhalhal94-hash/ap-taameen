@@ -13,6 +13,7 @@
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل' };
   const STATUS = { pending: 'بانتظار الرد', accepted: 'قبل', emergency: 'طوارئ', none: 'بدون مؤمّن', cancelled: 'ملغي' };
   const code = c => c ? c.split(' / ').map(x => `<span class="code">${[...x].map(ch => `<i>${esc(ch)}</i>`).join('')}</span>`).join(' / ') : '';
+  const short = n => String(n || '').replace(/^أ\.\s*/, '');
   const tName = id => A.isE(id) ? id.slice(2) : (A.byId[id] ? A.byId[id].name : id);
   const fmtTime = ms => new Intl.DateTimeFormat('ar', { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric' }).format(new Date(ms));
 
@@ -59,7 +60,7 @@
   function merged(cur, w) {
     const base = { ...w.info, backups: w.backups, sups: w.sups };
     const statusFor = to => to ? 'pending' : (w.emg ? 'emergency' : 'none');
-    if (!cur) return { ...base, to: w.to, toName: w.to ? tName(w.to) : '', emg: w.emg, status: statusFor(w.to), auto: false, refused: [], log: [], names: namesOf(w), createdAt: now(), updatedAt: now() };
+    if (!cur) return { ...base, to: w.to, toName: w.to ? tName(w.to) : '', emg: w.emg, status: statusFor(w.to), auto: false, first: w.to, refused: [], released: [], log: [], names: namesOf(w), createdAt: now(), updatedAt: now() };
     const n = { ...cur, ...base, names: { ...(cur.names || {}), ...namesOf(w) } };
     if (cur.status === 'cancelled' || cur.to !== w.to || (!w.to && cur.emg !== w.emg)) {
       if (cur.to && cur.to !== w.to && cur.status !== 'cancelled') n.log = [...(cur.log || []), { tid: cur.to, name: cur.toName, act: 'reassigned', at: now() }];
@@ -123,7 +124,7 @@
       lockPublished();   // اللي انرسل ما يتغيّر صاحبه إذا انعاد التوزيع
       for (const d of docs) {
         if (d.status === 'cancelled' || !(d.log || []).some(l => l.act !== 'accepted' && l.act !== 'reassigned')) continue;
-        const next = d.kind === 'swap' ? (d.to ? { b: d.to, s2: d.s2, t2: d.t2 } : null) : (d.to || null);
+        const next = d.kind === 'swap' ? (d.to ? { b: d.to, s2: d.s2, t2: d.t2 } : null) : (d.to || (d.emg ? 'E:' + d.emg : null));
         A.applyRefusal(d.date, { kind: d.kind, absent: d.absent, slot: d.slot }, d.refused, next);
       }
     }
@@ -151,9 +152,15 @@
     if (!list.length) { $('#respList').innerHTML = `<p class="muted">${docs.length ? 'لا يوجد في هذا التصنيف.' : 'ما انرسل شي لهذا اليوم بعد.'}</p>`; return; }
     $('#respList').innerHTML = list.map(d => {
       const ref = (d.refused || []).map(id => `<span class="who bad">${esc((d.names || {})[id] || tName(id))} <button class="link" data-exp="${d.id}" data-t="${id}" data-r="${d.kind === 'swap' ? 'swap' : 'refuse'}">استيضاح</button></span>`).join('');
-      const ACT = { rejected: 'اعتذر', returned: 'تراجع عن اعتذاره وسيحضر', undo: 'تراجع خلال ثوانٍ', withdrew: 'اعتذر بعد القبول' };
-      const notes = (d.log || []).filter(l => ACT[l.act] && (l.note || l.act !== 'rejected')).map(l => `<div class="rnote">${esc(l.name)}: ${ACT[l.act]}${l.note ? ` — «${esc(l.note)}»` : ''} <small>${fmtTime(l.at)}</small></div>`).join('');
-      const who = d.to ? esc(d.toName) : d.emg ? `${esc(d.emg)} <small>(طوارئ)</small>` : '<span class="muted">بدون مؤمّن</span>';
+      const ACT = { rejected: 'اعتذر', returned: 'تراجع عن اعتذاره وسيحضر', undo: 'تراجع خلال ثوانٍ', withdrew: 'اعتذر بعد القبول', askback: 'يطلب الرجوع للتكليف', admin: '', kept: 'أبقت الإدارة الزميل' };
+      const notes = (d.log || []).filter(l => l.act in ACT && l.act !== 'accepted' && (l.note || l.act !== 'rejected')).map(l => `<div class="rnote ${l.act === 'admin' || l.act === 'kept' ? 'adm' : ''}">${esc(l.name)}${ACT[l.act] ? ': ' + ACT[l.act] : ''}${l.note ? ` — «${esc(l.note)}»` : ''} <small>${fmtTime(l.at)}</small></div>`).join('');
+      const first = firstOf(d);
+      const req = d.returnReq ? `<div class="rreq">⭐ <b>${esc(d.returnReq.name)}</b> (المكلّف الأول) تراجع عن اعتذاره ويطلب الرجوع، والزميل ${esc(d.toName)} استلم.
+          <span class="btn-row"><button class="btn sm primary" data-ctl="giveback" data-id="${d.id}">اعتماد رجوعه</button><button class="btn sm" data-ctl="keep" data-id="${d.id}">إبقاء الزميل</button></span></div>` : '';
+      const ctl = `<div class="rctl"><span>تحكم الإدارة:</span>
+          <select data-assign="${d.id}"><option value="">إسناد إلى…</option>${assignOpts(d)}</select>
+          ${first && first !== d.to && (d.refused || []).includes(first) ? `<button class="btn sm" data-ctl="first" data-id="${d.id}">↩ إرجاعه للمكلّف الأول (${esc(short((d.names || {})[first] || tName(first)))})</button>` : ''}</div>`;
+      const who = d.to ? esc(d.toName) : d.emg ? `🛡 ${esc(d.emg)} <small>(الإدارة)</small>` : '<span class="muted">بدون مؤمّن</span>';
       const st = d.to ? `<span class="st ${d.status}">${d.status === 'accepted' ? '✓ قبل' : 'بانتظار الرد'}</span>` : '';
       const what = d.kind === 'swap'
         ? `يأخذ حصة ${esc(d.absentName)} <b>${esc(d.slotName)}</b> ${code(d.c)}، و${esc(d.absentName)} يأخذ حصته <b>${esc(d.s2Name || '')}</b>`
@@ -163,11 +170,78 @@
         <div class="rw">${what}</div>
         <div class="rto">المكلّف: <b>${who}</b> ${st} ${d.auto ? '<span class="st auto">بديل تلقائي</span>' : ''}
           ${d.to ? `<button class="link" data-exp="${d.id}" data-t="${d.to}" data-r="${d.kind === 'duty' ? 'duty' : d.kind === 'swap' ? 'swapabs' : 'cover'}">استيضاح عدم حضور</button>` : ''}</div>
-        ${ref ? `<div class="rref">اعتذر: ${ref}</div>` : ''}${notes}
+        ${ref ? `<div class="rref">اعتذر: ${ref}</div>` : ''}${notes}${req}${ctl}
       </div>`;
     }).join('');
   }
-  $('#respList').addEventListener('click', e => {
+  // ---------------- تحكم الإدارة الكامل ----------------
+  const firstOf = d => d.first || ((d.log || []).find(l => l.tid && l.tid !== 'admin') || {}).tid || d.to;
+  const rowOf = d => d.kind === 'swap' ? null : A.state.rows.find(r => r.absent === d.absent && r.slot === d.slot);
+  const swOf = d => { const sw = A.state.swaps.find(x => x.a === d.absent); const it = sw && sw.items.find(x => x.s === d.slot); return sw && it ? [sw, it] : null; };
+  function choices(d) {
+    // المعتذرون أولًا (يقدر يرفض عذرهم ويرجّع لهم التكليف)، بعدها المتاحين بالترتيب
+    const out = [], seen = new Set([d.to]);
+    (d.refused || []).forEach(id => { if (!seen.has(id)) { seen.add(id); out.push({ id, tag: id === firstOf(d) ? 'المكلّف الأول — اعتذر' : 'اعتذر' }); } });
+    if (d.kind === 'swap') { const x = swOf(d); if (x) A.swapRanked(x[0], x[1]).forEach((o, k) => { if (!seen.has(o.b)) { seen.add(o.b); out.push({ id: o.b, tag: k < 4 ? RANKW[k] : '', s2: o }); } }); }
+    else { const r = rowOf(d); if (r) A.ranked(r).forEach((id, k) => { if (!seen.has(id)) { seen.add(id); out.push({ id, tag: k < 4 ? RANKW[k] : '' }); } }); }
+    return out;
+  }
+  const RANKW = ['الأول', 'الثاني', 'الثالث', 'الرابع'];
+  const emgNames = () => (A.settings.emergency || '').split('\n').map(x => x.trim()).filter(Boolean);
+  const assignOpts = d => `<optgroup label="المعلمون">${choices(d).map(c => `<option value="${c.id}">${esc((d.names || {})[c.id] || tName(c.id))}${c.tag ? ' — ' + c.tag : ''}</option>`).join('')}</optgroup>`
+    + (d.kind !== 'swap' ? `<optgroup label="🛡 الإدارة تؤمّن">${emgNames().filter(n => n !== d.emg).map(n => `<option value="E:${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>` : '');
+  async function adminEmg(id, name) {
+    await S.tx('assign/' + id, c => {
+      if (!c) return null;
+      const prev = c.to;
+      return { ...c, to: '', toName: '', emg: name, status: 'emergency', auto: false, returnReq: null,
+        released: [...new Set([...(c.released || []), ...(prev ? [prev] : [])])],
+        log: [...(c.log || []), { tid: 'admin', name: 'الإدارة', act: 'admin', note: `تؤمّنها الإدارة: ${name}`, at: now() }], updatedAt: now() };
+    });
+    A.toast(`تؤمّنها الإدارة: ${name}`);
+  }
+  async function adminAssign(id, tid, how) {
+    const d = docs.find(x => x.id === id); if (!d) return;
+    const ch = choices(d).find(c => c.id === tid);
+    const nm = (d.names || {})[tid] || tName(tid);
+    await S.tx('assign/' + id, c => {
+      if (!c) return null;
+      const prev = c.to;
+      const n = { ...c, to: tid, toName: nm, status: how === 'accepted' ? 'accepted' : 'pending', auto: false, returnReq: null,
+        refused: (c.refused || []).filter(x => x !== tid),
+        released: [...new Set([...(c.released || []).filter(x => x !== tid), ...(prev && prev !== tid ? [prev] : [])])],
+        adminNote: (c.refused || []).includes(tid) ? 'أعادت الإدارة هذا التكليف لك' : '',
+        names: { ...(c.names || {}), [tid]: nm },
+        log: [...(c.log || []), { tid: 'admin', name: 'الإدارة', act: 'admin', note: `أسندت التكليف إلى ${nm}`, at: now() }], updatedAt: now() };
+      if (c.kind === 'swap') {
+        const mine = ([...(c.log || [])].reverse().find(l => l.tid === tid && l.mine) || {}).mine || (ch && ch.s2 ? { s2: ch.s2.s2, s2Name: A.slotPlain(ch.s2.s2, c.c).name, s2Time: A.slotPlain(ch.s2.s2, c.c).time, t2: ch.s2.t2 } : null);
+        if (mine) Object.assign(n, mine);
+      }
+      return n;
+    });
+    A.toast(`تم الإسناد إلى ${nm}`);
+  }
+  $('#respList').addEventListener('change', async e => {
+    const sel = e.target.closest('select[data-assign]'); if (!sel || !sel.value) return;
+    const d = docs.find(x => x.id === sel.dataset.assign), tid = sel.value;
+    if (tid.startsWith('E:')) {
+      const n = tid.slice(2);
+      if (!(await A.ask(`${n} يؤمّن ${d.slotName}؟${d.to ? ` (يُعفى ${d.toName})` : ''}`, 'تأكيد'))) { sel.value = ''; return; }
+      return adminEmg(d.id, n);
+    }
+    const nm = (d.names || {})[tid] || tName(tid);
+    if (!(await A.ask(`إسناد ${d.slotName} إلى ${nm}؟${d.to ? ` (يُعفى ${d.toName})` : ''}`, 'إسناد'))) { sel.value = ''; return; }
+    adminAssign(d.id, tid, 'pending');
+  });
+  $('#respList').addEventListener('click', async e => {
+    const c = e.target.closest('[data-ctl]');
+    if (c) {
+      const d = docs.find(x => x.id === c.dataset.id); if (!d) return;
+      if (c.dataset.ctl === 'first') { const f = firstOf(d); if (await A.ask(`إرجاع التكليف لـ ${(d.names || {})[f] || tName(f)} (المكلّف الأول) وإعفاء ${d.toName || 'الحالي'}؟`, 'إرجاع')) adminAssign(d.id, f, 'pending'); }
+      if (c.dataset.ctl === 'giveback' && d.returnReq) adminAssign(d.id, d.returnReq.tid, 'accepted');
+      if (c.dataset.ctl === 'keep') S.tx('assign/' + d.id, x => x && x.returnReq ? { ...x, returnReq: null, log: [...(x.log || []), { tid: 'admin', name: 'الإدارة', act: 'kept', at: now() }], updatedAt: now() } : null);
+      return;
+    }
     const b = e.target.closest('[data-exp]'); if (!b) return;
     const d = docs.find(x => x.id === b.dataset.exp); if (!d) return;
     const r = b.dataset.r;
@@ -284,7 +358,6 @@
   const supCodes = () => (A.settings.supCodes = A.settings.supCodes || {});
   const isSup = id => A.supOf(id).length > 0;
   const newCode = used => { let c; do { c = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); } while (used.has(c)); used.add(c); return c; };
-  const short = n => n.replace(/^أ\.\s*/, '');
   const msgFor = t => {
     const c = codes()[t.id], sc = supCodes()[t.id];
     return `السلام عليكم ${t.name}\nتطبيق التأمين والتبديل — مدرسة ابن رشد:\n${APP_URL}\nرمز دخولك: ${c}${sc ? `\nرمز المشرف (متابعة صفوفك): ${sc}` : ''}\nالرمز خاص بك، فضلًا لا تشاركه.`;

@@ -348,3 +348,11 @@ a.btn{text-decoration:none}
 .codes{display:inline-flex;gap:6px;margin-inline-start:auto;margin-inline-end:10px}
 .code-pill{font-family:"Readex",monospace;font-weight:700;letter-spacing:2px;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:1px 8px;direction:ltr}
 .code-pill.sup{background:rgba(184,134,43,.12);color:var(--warn);letter-spacing:1px}
+.rctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:.85rem}
+.rctl>span{color:var(--muted);font-weight:600}
+.rctl select{font:inherit;font-size:.85rem;padding:5px 8px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);max-width:100%}
+.rreq{margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(184,134,43,.12);border:1px solid rgba(184,134,43,.45);font-size:.88rem}
+.rreq .btn-row{display:inline-flex;margin-inline-start:8px}
+.rnote.adm{color:var(--red2);font-weight:600}
+.pick.adm{border-style:dashed;border-color:var(--gold);color:var(--warn)}
+.pick.adm.on{background:linear-gradient(135deg,#b8862b,#8a6420);color:#fff;border-style:solid}

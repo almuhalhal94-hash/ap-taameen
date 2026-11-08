@@ -515,14 +515,16 @@
         const cur = cands.find(c => c.t.id === r.sub);
         const badge = !r.sub ? '<span class="badge none">بدون مؤمِّن</span>' : isE(r.sub) ? '<span class="badge emg">طوارئ</span>' : cur && cur.same ? '<span class="badge dept">من القسم</span>' : '<span class="badge other">من قسم آخر</span>';
         const top = cands.filter(c => !c.over).slice(0, 4);
-        const picks = top.length ? `<div class="picks">${top.map((c, k) => `<button class="pick ${c.t.id === r.sub ? 'on' : ''}" data-pick="${i}" data-t="${c.t.id}" title="${esc(c.t.dept)}"><span class="rk">${RANK[k]}</span>${esc(c.t.name.replace(/^أ\.\s*/, ''))}${k === 0 ? '<i>الأنسب</i>' : ''}</button>`).join('')}</div>` : '';
+        const emgFree = emergencyFree(r, rows);
+        const emgBtn = emgFree.length || isE(r.sub) ? `<button class="pick adm ${isE(r.sub) ? 'on' : ''}" data-pick="${i}" data-t="${esc(isE(r.sub) ? r.sub : emgFree[0])}" title="${esc(emgFree.map(nm).join('، '))}">🛡 الإدارة تؤمّن${isE(r.sub) ? ': ' + esc(nm(r.sub)) : ''}</button>` : '';
+        const picks = top.length || emgBtn ? `<div class="picks">${top.map((c, k) => `<button class="pick ${c.t.id === r.sub ? 'on' : ''}" data-pick="${i}" data-t="${c.t.id}" title="${esc(c.t.dept)}"><span class="rk">${RANK[k]}</span>${esc(c.t.name.replace(/^أ\.\s*/, ''))}${k === 0 ? '<i>الأنسب</i>' : ''}</button>`).join('')}${emgBtn}</div>` : '';
         const refusedTxt = (r.refused || []).length ? ` <small class="muted">اعتذر: ${esc(r.refused.map(nm).join('، '))}</small>` : '';
         const refuseBtn = r.sub && !isE(r.sub) ? ` <button class="link" data-refuse="${i}">اعتذر</button>` : '';
         return `<tr class="${r.sub ? '' : 'missing'}">
           <td class="per" data-l="الحصة">${slotLabel(r.slot, r.c)}</td>
           <td data-l="الصف">${codeHTML(r.c)}</td>
           <td data-l="المادة">${esc(r.t)}${BREAKS.has(r.slot) ? ' <span class="badge duty">مراقبة</span>' : ''}</td>
-          <td data-l="المؤمِّن">${picks}<select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="طوارئ">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
+          <td data-l="المؤمِّن">${picks}<select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="الإدارة تؤمّن">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
         </tr>`;
       }).join('');
     }).join('');

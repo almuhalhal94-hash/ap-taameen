@@ -226,3 +226,5 @@ main{flex:1;padding:4px 16px calc(96px + var(--safe-b))}
 .s-wait{color:var(--gold2);border-color:rgba(226,180,90,.4);background:rgba(226,180,90,.07)}
 .s-bad{color:var(--bad);border-color:rgba(248,113,113,.4)}
 .lead b{color:var(--gold2)}
+.anote{margin-top:10px;font-size:.82rem;color:var(--gold2);background:rgba(226,180,90,.08);border:1px solid rgba(226,180,90,.35);border-radius:10px;padding:6px 10px;text-align:center}
+.wait-t{font-size:.72rem;color:var(--gold2)}
