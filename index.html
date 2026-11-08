@@ -27,6 +27,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" class="tab active" data-tab="today">تأمين اليوم</button>
     <button role="tab" class="tab" data-tab="swaps">التبديل والاستئذان</button>
+    <button role="tab" class="tab" data-tab="app">ردود المعلمين <span class="nbadge" id="appBadge" hidden></span></button>
     <button role="tab" class="tab" data-tab="stats">الإحصائيات والسجل</button>
     <button role="tab" class="tab" data-tab="teachers">المعلمون والجدول</button>
     <button role="tab" class="tab" data-tab="settings">الإعدادات</button>
@@ -111,6 +112,33 @@
     </section>
 
     <!-- ============ الإحصائيات ============ -->
+    <section class="panel" id="tab-app">
+      <div class="card">
+        <div class="card-head">
+          <div><h2>تطبيق المعلمين</h2><p class="hint" id="syncNote">جاري الاتصال…</p></div>
+          <div class="btn-row"><button class="btn primary" id="btnSend">إرسال تأمين اليوم للمعلمين</button></div>
+        </div>
+        <p class="hint" id="sendNote"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>الردود — <span id="respDay"></span></h2><div class="seg" id="respFilter"><button class="on" data-f="all">الكل</button><button data-f="pending">بانتظار</button><button data-f="accepted">قبل</button><button data-f="refused">اعتذر</button></div></div>
+        <div id="respList" class="resp-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>الاستيضاحات</h2><div class="btn-row"><button class="btn" id="btnNewExp">استيضاح جديد</button></div></div>
+        <div id="expList" class="exp-list"></div>
+      </div>
+      <div class="card">
+        <h2>المحادثات</h2>
+        <div class="chat-wrap"><div id="chatPeople" class="chat-people"></div><div id="chatThread" class="chat-thread"><p class="muted">اختر معلمًا.</p></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>روابط المعلمين</h2><p class="hint">لكل معلم رابط خاص يفتح له تطبيقه (مهامه فقط). أرسله له مرة وحدة، ويضيفه للشاشة الرئيسية.</p></div>
+          <div class="btn-row"><button class="btn" id="btnLinks">تجهيز الروابط</button><button class="btn" id="btnCopyAll">نسخ كل الروابط</button></div></div>
+        <div id="linkList" class="link-list"></div>
+      </div>
+    </section>
+
     <section class="panel" id="tab-stats">
       <div class="kpis" id="kpis"></div>
       <div class="card">
@@ -192,6 +220,18 @@
   </div>
 </div>
 
+<div id="expModal" class="modal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true" aria-labelledby="expTitle">
+    <h2 id="expTitle">استيضاح</h2>
+    <label class="field"><span>المعلم</span><select id="expTeacher"></select></label>
+    <label class="field"><span>الموضوع</span><select id="expReason">
+      <option value="cover">عدم حضور حصة التأمين</option><option value="duty">عدم الحضور لمراقبة الفسحة</option><option value="swap">رفض التبديل</option><option value="other">أخرى</option></select></label>
+    <label class="field"><span>التفاصيل (اليوم والحصة)</span><input type="text" id="expRef"></label>
+    <label class="field"><span>نص الاستيضاح</span><textarea id="expBody" rows="6"></textarea></label>
+    <div class="btn-row"><button class="btn primary" id="expSend">إرسال للمعلم</button><button class="btn" id="expCancel">إلغاء</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="assets/vendor/html2canvas.min.js"></script>
@@ -199,5 +239,8 @@
 <script src="data.js"></script>
 <script src="duties.js"></script>
 <script src="app.js"></script>
+<script src="firebase-config.js"></script>
+<script src="sync.js"></script>
+<script src="admin-sync.js"></script>
 </body>
 </html>

@@ -224,6 +224,7 @@
     const src = db.history[iso];
     state = src ? JSON.parse(JSON.stringify({ absent: src.absent || {}, rows: src.rows || [], swaps: src.swaps || [] })) : emptyDay();
     renderAll();
+    document.dispatchEvent(new CustomEvent('apt:day'));
   }
   // الحفظ تلقائي مع كل تغيير
   function commit() {
@@ -232,6 +233,7 @@
     else delete db.history[date];
     persist(); cloudDay(date);
     $('#savedFlag').hidden = !has;
+    document.dispatchEvent(new CustomEvent('apt:day'));
   }
 
   // ---------------- الجدول الفعلي لليوم (بعد التبديلات) ----------------
@@ -769,7 +771,8 @@
   function showTab(name) {
     document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
     document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
-    $('#dateArea').hidden = !(name === 'today' || name === 'swaps');
+    $('#dateArea').hidden = !(name === 'today' || name === 'swaps' || name === 'app');
+    document.dispatchEvent(new CustomEvent('apt:tab', { detail: name }));
     if (name === 'stats') renderStats();
     if (name === 'teachers') renderTeachers();
     if (name === 'settings') renderSettings();
@@ -923,6 +926,38 @@
     const gone = Object.keys(db.history); db.history = {}; persist(); gone.forEach(iso => cloudWrite(`days/${iso}`, null)); loadDate(date); toast('تم مسح السجل');
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) $('#modalNo').click(); });
+
+  // ---------------- واجهة للتطبيق الثلاثي (sync-admin.js) ----------------
+  const slotPlain = (s, code) => { const iv = ivOf(s, code); return { name: SLOT_NAME[s] || s, time: `${hm(iv[0])}–${hm(iv[1])}` }; };
+  window.APT = {
+    T, byId, nm, isE, DAYS, slotPlain, supOf, supAllows, supLabel, BREAK_GRADES, weekdayName, fmtG, fmtH, isoOf, toast, ask, esc,
+    get date() { return date; },
+    get state() { return state; },
+    get settings() { return db.settings; },
+    saveSettings() { persist(); cloudConfig(); },
+    // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
+    ranked(row) { return candidates(row, state.rows, historyCounts(date), context()).filter(c => !c.over).map(c => c.t.id); },
+    swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },
+    // يطبّق رد معلم: اعتذار (يضاف للمعتذرين) والبديل الجديد اللي اختاره التطبيق
+    applyRefusal(iso, key, refused, next) {
+      if (iso !== date) return false;
+      let changed = false;
+      if (key.kind === 'swap') {
+        const sw = state.swaps.find(x => x.a === key.absent); const it = sw && sw.items.find(x => x.s === key.slot);
+        if (!it) return false;
+        if (next && next.b && (it.b !== next.b || it.s2 !== next.s2)) { Object.assign(it, { b: next.b, s2: next.s2, t2: next.t2 || '', m: true, none: false }); changed = true; }
+        if (!next && it.b && refused.includes(it.b)) { Object.assign(it, { b: '', s2: '', t2: '', m: false, none: true }); changed = true; }
+      } else {
+        const r = state.rows.find(x => x.absent === key.absent && x.slot === key.slot); if (!r) return false;
+        const merged = [...new Set([...(r.refused || []), ...refused])];
+        if (merged.length !== (r.refused || []).length) { r.refused = merged; changed = true; }
+        if (next && r.sub !== next) { r.sub = next; r.m = true; changed = true; }
+        if (!next && r.sub && merged.includes(r.sub)) { r.sub = ''; r.m = false; changed = true; }
+      }
+      if (changed) { recompute(); renderAll(); }
+      return changed;
+    }
+  };
 
   // ---------------- البداية ----------------
   renderHeroDate();

@@ -1,0 +1,16 @@
+{
+  "name": "تأمين ابن رشد",
+  "short_name": "تأمين ابن رشد",
+  "description": "التأمين والمراقبة والتبديل — مدرسة ابن رشد الإعدادية للبنين",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#140c0b",
+  "theme_color": "#4d0610",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

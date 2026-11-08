@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تأمين ابن رشد</title>
+<meta name="theme-color" content="#4d0610">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="تأمين ابن رشد">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell" id="shell">
+  <header class="top">
+    <div class="brand"><span class="logo">ر</span><div><small>مدرسة ابن رشد الإعدادية للبنين</small><b>التأمين والتبديل</b></div></div>
+    <div class="me"><small id="today"></small><b id="myName">…</b></div>
+  </header>
+
+  <main id="views">
+    <section class="view active" id="v-tasks">
+      <div class="stack-wrap">
+        <div class="stack" id="stack"></div>
+        <div class="empty" id="emptyTasks" hidden>
+          <div class="empty-ic">✓</div>
+          <b>ما عندك مهام جديدة</b>
+          <p>أي تأمين أو مراقبة أو تبديل يخصك يطلع هنا أول ما ترسله الإدارة.</p>
+        </div>
+        <div class="acts" id="acts" hidden>
+          <button class="act no" id="btnNo" aria-label="اعتذار"><span>✕</span>اعتذار</button>
+          <button class="act yes" id="btnYes" aria-label="قبول"><span>✓</span>قبول</button>
+        </div>
+        <p class="swipe-hint" id="swipeHint" hidden>اسحب البطاقة <b class="y">يمين للقبول</b> أو <b class="n">يسار للاعتذار</b></p>
+      </div>
+      <h3 class="sec">المؤكدة</h3>
+      <div id="doneList" class="list"></div>
+    </section>
+
+    <section class="view" id="v-sup">
+      <p class="lead" id="supLead"></p>
+      <div id="supList" class="list"></div>
+    </section>
+
+    <section class="view" id="v-exp">
+      <div id="expList" class="list"></div>
+    </section>
+
+    <section class="view" id="v-chat">
+      <div class="chat">
+        <div class="chat-h">المحادثة مع الإدارة <small>(تنحفظ موثّقة عند المدير المساعد)</small></div>
+        <div class="chat-body" id="chatBody"></div>
+        <form class="chat-in" id="chatForm"><input id="chatText" placeholder="اكتب رسالة…" autocomplete="off"><button aria-label="إرسال">➤</button></form>
+      </div>
+    </section>
+
+    <section class="view" id="v-bad">
+      <div class="empty"><div class="empty-ic">!</div><b>الرابط غير صحيح</b><p>اطلب رابطك الخاص من المدير المساعد.</p></div>
+    </section>
+  </main>
+
+  <nav class="bar" id="bar">
+    <button class="on" data-v="tasks"><i>▤</i>مهامي<span class="nb" id="nbTasks" hidden></span></button>
+    <button data-v="sup" id="tabSup" hidden><i>◉</i>المشرف<span class="nb" id="nbSup" hidden></span></button>
+    <button data-v="exp"><i>✎</i>الاستيضاح<span class="nb" id="nbExp" hidden></span></button>
+    <button data-v="chat"><i>✉</i>المحادثة<span class="nb" id="nbChat" hidden></span></button>
+  </nav>
+  <div class="demo" id="demoNote" hidden>وضع تجربة — على هذا الجهاز فقط</div>
+  <button class="notif" id="btnNotif" hidden>🔔 فعّل التنبيهات</button>
+</div>
+
+<div class="sheet-bg" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+    <h3 id="sheetT">الاعتذار</h3>
+    <p class="muted">يوصل للمدير المساعد فقط. السبب اختياري.</p>
+    <div class="chips" id="whyChips"><button>عندي حصة</button><button>ظرف طارئ</button><button>مريض</button><button>خارج المدرسة</button></div>
+    <textarea id="whyText" rows="2" placeholder="سبب آخر…"></textarea>
+    <div class="sheet-btns"><button class="b-no" id="sheetSend">إرسال الاعتذار</button><button class="b-ghost" id="sheetBack">تراجع</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="../firebase-config.js"></script>
+<script src="../sync.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

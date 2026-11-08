@@ -1,0 +1,11 @@
+rules_version = '2';
+// قواعد المرحلة الأولى: المجموعات الأربع فقط، وروابط المعلمين ما تنعرض كقائمة (لازم تعرف الرابط).
+// ملاحظة صريحة: هذي حماية أساسية. الحماية الكاملة (كل معلم يقرأ بس مهامه) تحتاج تسجيل دخول — مرحلة ثانية.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    match /people/{key} { allow get: if true; allow list: if false; allow write: if true; }
+    match /assign/{id}  { allow read, write: if true; }
+    match /explain/{id} { allow read, write: if true; }
+    match /msgs/{id}    { allow read, write: if true; }
+  }
+}
