@@ -13,7 +13,7 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Readex","ReadexL",system-ui,sans-serif;font-size:15px;line-height:1.55;overscroll-behavior:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Readex","ReadexL",system-ui,sans-serif;font-size:15px;line-height:1.55;overscroll-behavior:none;overflow-x:hidden;overflow-x:clip}
 body{background:radial-gradient(120% 60% at 50% -10%,#4d0610 0%,transparent 60%),var(--bg)}
 button{font:inherit;color:inherit;cursor:pointer}
 .muted{color:var(--muted)}
@@ -28,7 +28,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .me small{display:block;color:var(--muted);font-size:.7rem}
 .me b{font-size:.95rem;color:var(--gold2)}
 
-main{flex:1;padding:4px 16px calc(96px + var(--safe-b))}
+main{flex:1;overflow-x:clip;padding:4px 16px calc(96px + var(--safe-b))}
 .view{display:none;animation:fade .35s ease}
 .view.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

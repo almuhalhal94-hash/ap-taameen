@@ -9,6 +9,7 @@
       "firestore.rules",
       "**/.*",
       "tools/**",
+      "docs/**",
       "*.md",
       "demo.html"
     ],
