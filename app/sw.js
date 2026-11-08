@@ -1,5 +1,5 @@
 // يخلي التطبيق قابل للتثبيت ويفتح بسرعة. الشبكة أولًا دايمًا (البيانات الحية من Firebase ما تنحفظ هنا)
-const C = 'apt-shell-v2';
+const C = 'apt-shell-v3';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', e => {

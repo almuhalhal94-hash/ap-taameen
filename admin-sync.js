@@ -387,7 +387,7 @@
     const res = (q.result || []).map(x => `<div class="rnote ${x.ok ? '' : 'adm'}">${x.ok ? '⇄' : '⚠'} ${esc(x.txt)}</div>`).join('');
     const btns = q.status === 'pending' ? `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-rq-auto="${q.id}">⚡ تبديل تلقائي</button><button class="btn sm" data-rq-manual="${q.id}">✋ أرتبه بنفسي</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>` : '';
     return `<div class="resp v-${st[0]}"><div class="vstate">${st[1]} — طلب تبديل من ${esc(q.name)}</div>
-      <div class="rw"><b>${when}</b> · الحصص: <b>${q.slots.map(PER).join('، ')}</b></div>
+      <div class="rw"><b>${when}</b> · الحصص: <b>${q.slots.map(k => PER(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '')).join('، ')}</b></div>
       <div class="rw">السبب: «${esc(q.reason)}»${q.prefer ? ` · الزميل المقترح: <b>${esc(q.prefer)}</b>` : ''}</div>${res}${q.adminNote ? `<div class="rnote adm">ردّ الإدارة: ${esc(q.adminNote)}</div>` : ''}${compact ? '' : btns}</div>`;
   }
   function renderReqs() {
