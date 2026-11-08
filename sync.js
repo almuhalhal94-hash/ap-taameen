@@ -41,7 +41,7 @@
     const subs = new Set();
     const bc = 'BroadcastChannel' in window ? new BroadcastChannel('apt-sync') : null;
     const fire = () => subs.forEach(s => s());
-    const save = () => { localStorage.setItem(KEY, JSON.stringify(all)); if (bc) bc.postMessage(1); setTimeout(fire, 0); };
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch (e) { } if (bc) bc.postMessage(1); setTimeout(fire, 0); };
     const reload = () => { all = load(); fire(); };
     if (bc) bc.onmessage = reload;
     window.addEventListener('storage', e => { if (e.key === KEY) reload(); });

@@ -40,7 +40,7 @@
   // ---------- الهوية من الرابط ----------
   const S = await window.Sync.ready;
   $('#demoNote').hidden = S.mode !== 'demo';
-  const urlK = new URLSearchParams(location.search).get('k');
+  const urlK = new URLSearchParams(location.search).get('k') || (location.hash.match(/^#k-([a-z0-9-]+)$/i) || [])[1];
   if (urlK) { try { localStorage.setItem('apt-key', urlK); } catch (e) { } }
   const KEY = urlK || (() => { try { return localStorage.getItem('apt-key'); } catch (e) { return null; } })();
   const me = KEY ? await S.get('people/' + KEY).catch(() => null) : null;
