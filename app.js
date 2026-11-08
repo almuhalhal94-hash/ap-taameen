@@ -28,7 +28,7 @@
     const iv = ivOf(s, code);
     return `${SLOT_NAME[s]} <small class="tm"><bdi dir="ltr">${hm(iv[0])}–${hm(iv[1])}</bdi></small>`;
   };
-  const NON_TEACHING = new Set(['مراقبة', 'اجتماع القسم', 'اجتماع التحسين', 'مشرف متابع']);
+  const NON_TEACHING = new Set(['مراقبة', 'اجتماع', 'اجتماع القسم', 'اجتماع التحسين', 'تطوير مهني', 'مشرف متابع']);
   const STORE = 'ap-taameen-v1';
   const slotIdx = s => SLOT_ORDER.indexOf(s);
 
