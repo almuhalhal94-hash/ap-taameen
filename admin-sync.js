@@ -7,7 +7,7 @@
   const esc = A.esc;
   const S = await window.Sync.ready;
   const DEMO = S.mode === 'demo';
-  let docs = [], exps = [], msgs = [];
+  let docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false;
   const ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
   const now = () => Date.now();
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل' };
@@ -404,9 +404,60 @@
     copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${isSup(t.id) ? ' (معلم + مشرف)' : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
   });
 
+  // ---------------- تنبيهات واضحة: اعتذار، طلب رجوع، تراجع ----------------
+  const ALERT = { rejected: ['⚠', 'اعتذار من'], withdrew: ['⚠', 'اعتذار بعد الاستلام من'], askback: ['⭐', 'طلب رجوع للتكليف من'], returned: ['✓', 'تراجع عن اعتذاره وسيحضر:'] };
+  const seenA = (() => { try { return new Set(JSON.parse(localStorage.getItem('apt-admin-seen') || '[]')); } catch (e) { return new Set(); } })();
+  const saveSeen = () => { try { localStorage.setItem('apt-admin-seen', JSON.stringify([...seenA].slice(-500))); } catch (e) { } };
+  const today = A.isoOf(new Date());
+  S.watch('assign', null, list => {
+    allDocs = list;
+    const fresh = [];
+    alerts = [];
+    for (const d of list) {
+      if (d.date < today || d.status === 'cancelled') continue;
+      for (const l of d.log || []) {
+        if (!ALERT[l.act]) continue;
+        const k = `${d.id}|${l.at}`;
+        if (seenA.has(k)) continue;
+        alerts.push({ k, d, l });
+        if (alertsReady) fresh.push({ d, l });
+      }
+    }
+    alerts.sort((a, b) => b.l.at - a.l.at);
+    renderAlerts(); badge();
+    fresh.forEach(({ d, l }) => {
+      const t = `${ALERT[l.act][1]} ${l.name}`, body = `${d.slotName} ${d.c || ''} — ${A.weekdayName(d.date)}${l.note ? ' — ' + l.note : ''}`;
+      A.toast(`${t} — ${d.slotName}`);
+      try { if ('Notification' in window && Notification.permission === 'granted') new Notification(t, { body, lang: 'ar', dir: 'rtl', tag: d.id }); } catch (e) { }
+    });
+    alertsReady = true;
+  });
+  function renderAlerts() {
+    const el = $('#appAlerts');
+    el.hidden = !alerts.length;
+    el.innerHTML = alerts.slice(0, 6).map(({ k, d, l }) => {
+      const where = d.kind === 'duty' ? `${esc(d.slotName)} — ${esc(d.label.replace('مراقبة — ', ''))}` : `الحصة ${esc(d.slotName)}${d.c ? ' (' + code(d.c) + ')' : ''}`;
+      const now2 = d.to ? `التكليف الحين عند <b>${esc(d.toName)}</b> ${d.status === 'accepted' ? '(استلم ✓)' : '(بانتظار استلامه)'}` : d.emg ? `تؤمّنها الإدارة: <b>${esc(d.emg)}</b>` : '<b class="bad-t">ما فيه مؤمّن — يحتاج قرارك</b>';
+      return `<div class="al al-${l.act}"><div class="al-t">${ALERT[l.act][0]} ${ALERT[l.act][1]} <b>${esc(l.name)}</b> — ${KIND[d.kind]}، ${where}، ${esc(A.weekdayName(d.date))} ${esc(A.fmtG(d.date))}</div>
+        ${l.note ? `<div class="al-n">العذر: «${esc(l.note)}»</div>` : ''}<div class="al-n">${now2}</div>
+        <div class="al-b"><button class="btn sm primary" data-al-go="${d.date}">اتخذ قرار</button><button class="btn sm" data-al-seen="${esc(k)}">تم الاطلاع</button></div></div>`;
+    }).join('') + (alerts.length > 6 ? `<p class="hint">و${alerts.length - 6} تنبيهات ثانية في «ردود المعلمين».</p>` : '');
+  }
+  $('#appAlerts').addEventListener('click', e => {
+    const s2 = e.target.closest('[data-al-seen]'), g = e.target.closest('[data-al-go]');
+    if (s2) { seenA.add(s2.dataset.alSeen); saveSeen(); alerts = alerts.filter(a => a.k !== s2.dataset.alSeen); renderAlerts(); badge(); }
+    if (g) {
+      if (g.dataset.alGo !== A.date) { $('#dateInput').value = g.dataset.alGo; $('#dateInput').dispatchEvent(new Event('change')); }
+      document.querySelector('.tab[data-tab="app"]').click();
+      setTimeout(() => $('#respList').scrollIntoView({ behavior: 'smooth' }), 200);
+    }
+  });
+  // نطلب إذن تنبيهات المتصفح أول ما يرسل
+  document.addEventListener('click', e => { if (e.target.closest('[data-send-now], #btnSend') && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => { }); });
+
   // ---------------- الشارة ----------------
   function badge() {
-    const n = msgs.filter(m => m.from === 'teacher' && !m.readA).length + exps.filter(x => x.reply && !x.seenA).length;
+    const n = msgs.filter(m => m.from === 'teacher' && !m.readA).length + exps.filter(x => x.reply && !x.seenA).length + alerts.length;
     const el = $('#appBadge'); el.hidden = !n; el.textContent = n;
   }
 

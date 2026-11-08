@@ -211,12 +211,12 @@
   if (TEACH) {
     S.watch('assign', ['to', '==', ME], list => {
       mine = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD);
-      mine.filter(d => d.status === 'pending').forEach(d => alertNew('a:' + d.id + ':' + (d.log || []).length, 'تكليف جديد: ' + KIND[d.kind], `${dayLabel(d)} — ${d.slotName}${d.c ? ' ' + d.c : ''}`));
+      mine.filter(d => d.status === 'pending').forEach(d => alertNew('a:' + d.id + ':' + (d.log || []).length, `📋 تكليف جديد: ${KIND[d.kind]} — ${dayLabel(d)}`, d.kind === 'duty' ? `${d.slotName} (${d.time}) — ${d.label.replace('مراقبة — ', '')}` : `الحصة ${d.slotName} (${d.time})${d.c ? ' — صف ' + d.c : ''} — بدل ${d.absentName}. افتح التطبيق للاستلام.`));
       renderTasks();
     });
     S.watch('assign', ['released', 'array-contains', ME], list => {
       released = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD);
-      released.filter(d => d.to !== ME).forEach(d => alertNew('r:' + d.id + ':' + d.to, 'أعفتك الإدارة من تكليف', `${dayLabel(d)} — ${d.slotName}`));
+      released.filter(d => d.to !== ME).forEach(d => alertNew('r:' + d.id + ':' + d.to, '✓ أعفتك الإدارة من تكليف', `${KIND[d.kind]} — الحصة ${d.slotName} ${dayLabel(d)}. ما تحتاج تحضرها، شكرًا لك.`));
       renderDone();
     });
     S.watch('assign', ['refused', 'array-contains', ME], list => { refusedByMe = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD); renderDone(); });
@@ -360,7 +360,7 @@
     $('#supLead').innerHTML = `صفوف إشرافك: <b>${esc(me.supLabel || '')}</b>`;
     S.watch('assign', ['sups', 'array-contains', ME], list => {
       supL = list.filter(d => d.date >= TODAY && d.status !== 'cancelled').sort(sortD);
-      supL.filter(d => d.status === 'accepted').forEach(d => alertNew('s:' + d.id + ':' + d.to, 'تأكد التأمين — ' + d.slotName, `${short(d.toName)} في ${d.c || d.label}`));
+      supL.filter(d => d.status === 'accepted').forEach(d => alertNew('s:' + d.id + ':' + d.to, `◉ تأكد التأمين — الحصة ${d.slotName} ${dayLabel(d)}`, `${d.toName} استلم ${d.kind === 'duty' ? d.label : 'صف ' + d.c}`));
       renderSup();
     });
   }
@@ -384,7 +384,7 @@
   // ---------- الاستيضاح ----------
   if (TEACH) S.watch('explain', ['tid', '==', ME], list => {
     exps = list.sort((a, b) => b.sentAt - a.sentAt);
-    exps.forEach(x => alertNew('e:' + x.id, 'استيضاح من الإدارة', x.reasonText));
+    exps.forEach(x => alertNew('e:' + x.id, '✎ استيضاح من الإدارة', `${x.reasonText}${x.ref ? ' — ' + x.ref : ''}. مطلوب ردك من التطبيق.`));
     setNb('#nbExp', exps.filter(x => !x.reply).length);
     renderExp();
   });
@@ -411,7 +411,7 @@
   // ---------- المحادثة ----------
   S.watch('msgs', ['tid', '==', ME], list => {
     msgs = list.sort((a, b) => a.at - b.at);
-    msgs.filter(m => m.from === 'admin').forEach(m => alertNew('m:' + m.id, 'رسالة من الإدارة', m.text.slice(0, 80)));
+    msgs.filter(m => m.from === 'admin').forEach(m => alertNew('m:' + m.id, '✉ رسالة من الإدارة', m.text.slice(0, 120)));
     setNb('#nbChat', msgs.filter(m => m.from === 'admin' && !m.readT).length);
     if (cur === 'chat') { renderChat(); markChatRead(); }
   });
