@@ -21,20 +21,19 @@
     <div class="hero-in">
       <div>
         <p class="hero-kicker">مكتب المدير المساعد</p>
-        <h1>تأمين الحصص</h1>
-        <p class="hero-sub">اختر الغائبين أو سجّل طلب تبديل، والنظام يوزّع الحصص بعدالة ويحفظها تلقائيًا — وبعدها نزّل الكشف PDF للتوقيع.</p>
+        <h1>التأمين والتبديل</h1>
       </div>
       <div class="hero-date" id="heroDate"></div>
     </div>
   </header>
 
   <nav class="tabs" role="tablist">
-    <button role="tab" class="tab active" data-tab="today">تأمين اليوم</button>
-    <button role="tab" class="tab" data-tab="swaps">التبديل والاستئذان</button>
-    <button role="tab" class="tab" data-tab="app">ردود المعلمين <span class="nbadge" id="appBadge" hidden></span></button>
-    <button role="tab" class="tab" data-tab="stats">الإحصائيات والسجل</button>
-    <button role="tab" class="tab" data-tab="teachers">المعلمون والجدول</button>
-    <button role="tab" class="tab" data-tab="settings">الإعدادات</button>
+    <button role="tab" class="tab active" data-tab="today"><i>🛡</i>التأمين</button>
+    <button role="tab" class="tab" data-tab="swaps"><i>⇄</i>التبديل</button>
+    <button role="tab" class="tab" data-tab="app"><i>📲</i>الردود <span class="nbadge" id="appBadge" hidden></span></button>
+    <button role="tab" class="tab" data-tab="stats"><i>📊</i>السجل</button>
+    <button role="tab" class="tab" data-tab="teachers"><i>👥</i>المعلمون</button>
+    <button role="tab" class="tab" data-tab="settings"><i>⚙</i>الإعدادات</button>
   </nav>
 
   <div class="alerts" id="appAlerts" hidden></div>
@@ -57,17 +56,18 @@
     <!-- ============ تأمين اليوم ============ -->
     <section class="panel active" id="tab-today">
       <div id="dayWork">
-        <div class="card">
+        <div class="day-sum" id="daySum"></div>
+        <div class="card" id="absCard">
           <div class="card-head">
             <h2><span class="step">١</span> من الغائب اليوم؟</h2>
             <input type="search" id="absSearch" class="search" placeholder="ابحث باسم المعلم…">
           </div>
-          <p class="hint">اضغط على اسم المعلم الغائب. تقدر تحدد حصص معيّنة لو كان غيابه جزئي (استئذان مثلًا). المعلمون غير المتواجدين اليوم حسب الجدول يظهرون باهتين ولا يدخلون في التأمين.</p>
+          <p class="hint">اضغط اسم الغائب، والتأمين يتوزّع تلقائيًا تحت.</p>
           <div id="absList" class="dept-list"></div>
         </div>
 
         <div class="card" id="absDetail" hidden>
-          <h2><span class="step">٢</span> حصص الغائبين اليوم</h2>
+          <h2 class="sub-h">حصص الغائبين <small>— شيل الحصة اللي ما يحتاج لها تأمين (غياب جزئي)</small></h2>
           <div id="absSlots"></div>
         </div>
 
@@ -75,17 +75,19 @@
 
         <div class="card" id="resultCard" hidden>
           <div class="card-head">
-            <div><h2><span class="step">٣</span> جدول التأمين</h2><div class="mode-seg" role="group" aria-label="طريقة التوزيع"><button data-key="coverMode" data-mode="auto">⚡ تلقائي</button><button data-key="coverMode" data-mode="manual">✋ أختار بنفسي</button></div><p class="hint mode-note" id="coverModeNote"></p></div>
-            <div class="btn-row">
-              <button class="btn" id="btnRedistribute" title="يلغي اختياراتك اليدوية ويعيد التوزيع">إعادة التوزيع</button>
-              <button class="btn" id="btnPrint" hidden>طباعة</button>
-              <button class="btn primary" id="btnPdf">تنزيل الكشف PDF</button>
-              <button class="btn send" data-send-now>📲 إرسال للمعلمين</button>
-            </div>
+            <h2><span class="step">٢</span> التأمين</h2>
+            <div class="mode-seg" role="group" aria-label="طريقة التوزيع"><button data-key="coverMode" data-mode="auto">⚡ تلقائي</button><button data-key="coverMode" data-mode="manual">✋ يدوي</button></div>
           </div>
-          <p class="hint">التوزيع تلقائي ويتحفظ أول بأول. تقدر تغيّر المؤمِّن من القائمة، والأسماء مرتبة من الأنسب: نفس القسم أولًا ثم الأقل تأمينًا والأخف نصابًا اليوم.</p>
-          <div class="table-wrap"><table class="res-table" id="resTable"></table></div>
+          <p class="hint mode-note" id="coverModeNote"></p>
+          <div class="cover-list" id="resTable"></div>
           <div class="load-today" id="loadToday"></div>
+          <div class="send-bar" id="sendBar">
+            <span class="step">٣</span>
+            <button class="btn send big" data-send-now>📲 إرسال للمعلمين</button>
+            <button class="btn" id="btnPdf">تنزيل الكشف PDF</button>
+            <button class="btn" id="btnPrint" hidden>طباعة</button>
+            <button class="link" id="btnRedistribute" title="يلغي اختياراتك اليدوية ويعيد التوزيع">↻ إعادة التوزيع</button>
+          </div>
         </div>
       </div>
     </section>
@@ -225,6 +227,15 @@
 <!-- ============ كشف الطباعة ============ -->
 <div id="printSheet" class="print-sheet" aria-hidden="true"></div>
 
+<div id="pickModal" class="modal sheet" hidden>
+  <div class="modal-box pick-box" role="dialog" aria-modal="true" aria-labelledby="pkHead">
+    <button class="pk-x" data-pkclose aria-label="إغلاق">✕</button>
+    <div class="pk-head" id="pkHead"></div>
+    <p class="pk-note">مرتّبين من الأنسب: نفس القسم، ثم الأقل تأمينًا، ثم الأخف نصابًا اليوم.</p>
+    <div class="pk-list" id="pkList"></div>
+    <div class="pk-foot"><button class="btn danger" id="pkRefuse"></button><button class="link" id="pkNone">بدون تأمين</button></div>
+  </div>
+</div>
 <div id="modal" class="modal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalMsg">
     <p id="modalMsg"></p>

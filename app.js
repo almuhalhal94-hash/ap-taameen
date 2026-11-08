@@ -28,6 +28,7 @@
     const iv = ivOf(s, code);
     return `${SLOT_NAME[s]} <small class="tm"><bdi dir="ltr">${hm(iv[0])}–${hm(iv[1])}</bdi></small>`;
   };
+  const slotPlain = (s, code) => { const iv = ivOf(s, code); return { name: SLOT_NAME[s] || s, time: `${hm(iv[0])}–${hm(iv[1])}` }; };
   const NON_TEACHING = new Set(['مراقبة', 'اجتماع', 'اجتماع القسم', 'اجتماع التحسين', 'تطوير مهني', 'مشرف متابع']);
   const STORE = 'ap-taameen-v1';
   const slotIdx = s => SLOT_ORDER.indexOf(s);
@@ -507,45 +508,94 @@
     $('#coverModeNote').textContent = db.settings.coverMode === 'manual' ? 'اختر لكل حصة من المرتّبين حسب الأولوية (الأول هو الأنسب).' : 'النظام يختار الأنسب تلقائيًا، وتقدر تغيّر أي حصة بضغطة.';
     $('#swapModeNote').textContent = db.settings.swapMode === 'manual' ? 'اختر البديل لكل حصة من المرتّبين حسب الأولوية.' : 'النظام يختار أنسب بديل تلقائيًا، وتقدر تغيّره.';
   }
+  // ملاحظة المرشّح بكلام بسيط
+  const candNote = (c, r) => [c.same ? 'نفس القسم' : c.t.dept, c.h ? `أمّن سابقًا ${arNum(c.h)} ${c.h > 2 ? 'مرات' : 'مرة'}` : 'ما أمّن سابقًا', `نصابه اليوم ${arNum(c.load)} ${c.load > 2 && c.load < 11 ? 'حصص' : 'حصة'}`, c.swp ? 'عنده تبديل اليوم' : ''].filter(Boolean).join('، ');
+  const candWarn = (c, r, all) => [c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
+  function rowInfo(r, i, hist, ctx) {
+    const cands = candidates(r, state.rows, hist, ctx);
+    const cur = cands.find(c => c.t.id === r.sub);
+    const warns = cur ? candWarn(cur, r) : [];
+    const st = !r.sub ? 'missing' : warns.length ? 'warn' : isE(r.sub) ? 'emg' : 'ok';
+    return { cands, cur, warns, st };
+  }
+  function renderSummary() {
+    const rows = state.rows, hist = historyCounts(date), ctx = context();
+    const absN = Object.keys(state.absent).length + new Set(rows.filter(r => r.kind === 'out').map(r => r.absent)).size;
+    let done = 0, need = 0, warn = 0;
+    rows.forEach((r, i) => { const x = rowInfo(r, i, hist, ctx); if (r.sub) done++; if (x.st === 'missing') need++; if (x.st === 'warn') warn++; });
+    const sentBtn = document.querySelector('[data-send-now]'), sent = !!(sentBtn && sentBtn.classList.contains('done'));
+    const s1 = absN ? 'done' : 'cur', s2 = !rows.length ? '' : need ? 'cur' : 'done', s3 = rows.length && !need ? (sent ? 'done' : 'cur') : '';
+    $('#daySum').innerHTML = `<ol class="stepper">
+        <li class="${s1}" data-go="absCard"><i>١</i><span>الغائبون</span></li>
+        <li class="${s2}" data-go="resultCard"><i>٢</i><span>التأمين</span></li>
+        <li class="${s3}" data-go="sendBar"><i>٣</i><span>الإرسال</span></li>
+      </ol>
+      <div class="sumnums">
+        <div><b>${arNum(absN)}</b><span>غائب</span></div>
+        <div><b>${arNum(done)}<small>/${arNum(rows.length)}</small></b><span>حصة مؤمّنة</span></div>
+        ${need ? `<div class="need bad" data-go="firstNeed"><b>${arNum(need)}</b><span>بدون مؤمّن</span></div>` : ''}
+        ${warn ? `<div class="need" data-go="firstWarn"><b>${arNum(warn)}</b><span>للضرورة ⚠</span></div>` : ''}
+        ${!need && !warn ? `<div class="calm"><b>✓</b><span>كله تمام</span></div>` : ''}
+        <div class="${sent ? 'calm' : ''}"><b>${sent ? '✓' : '—'}</b><span>${sent ? 'انرسل للمعلمين' : 'لم يُرسل'}</span></div>
+      </div>`;
+  }
   function renderResults() {
     renderModes();
     const rows = state.rows;
     $('#resultCard').hidden = !rows.length;
+    renderSummary();
     if (!rows.length) { $('#loadToday').innerHTML = ''; return; }
     const hist = historyCounts(date), ctx = context();
-    const body = groupRows(rows).map(g => {
-      const head = `<tr class="grp"><td colspan="4"><b>${esc(nm(g.absent))}</b> <span class="badge ${g.kind === 'out' ? 'other' : 'none'}">${g.kind === 'out' ? 'مستأذن' : 'غائب'}</span> <small class="muted">· ${esc(byId[g.absent].dept)} · ${arNum(g.rows.length)} حصة</small></td></tr>`;
-      return head + g.rows.map(({ r, i }) => {
-        const cands = candidates(r, rows, hist, ctx);
-        const opts = cands.map(c => {
-          const note = [c.same ? 'نفس القسم' : c.t.dept, `أمّن ${arNum(c.h)}`, `${arNum(c.load)} حصص اليوم`, c.over ? `⚠ ${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} (للضرورة)` : '', c.adj ? `⚠ عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', c.swp ? 'عنده تبديل اليوم' : '', c.run >= 4 ? `⚠ ${arNum(c.run)} متتالية` : ''].filter(Boolean).join(' · ');
-          return `<option value="${c.t.id}" ${c.t.id === r.sub ? 'selected' : ''}>${esc(c.t.name)} — ${esc(note)}</option>`;
-        }).join('');
-        const emg = emergencyFree(r, rows).map(id => `<option value="${esc(id)}" ${id === r.sub ? 'selected' : ''}>${esc(nm(id))}</option>`).join('');
-        const cur = cands.find(c => c.t.id === r.sub);
-        const badge = !r.sub ? '<span class="badge none">بدون مؤمِّن</span>' : isE(r.sub) ? '<span class="badge emg">طوارئ</span>' : cur && cur.same ? '<span class="badge dept">من القسم</span>' : '<span class="badge other">من قسم آخر</span>';
-        const top = cands.filter(c => !c.over).slice(0, 4);
-        const second = cur && cur.over ? `<div class="warn2">⚠ للضرورة: ${esc(cur.t.name)} سيحضر <b>تأمينين في هذا اليوم</b>، لأنه ما فيه معلم متاح بتأمين واحد.</div>` : '';
-        const adjW = cur && cur.adj ? `<div class="warn2">⚠ ${esc(cur.t.name)} عنده حصة ${cur.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة مباشرة (ما فيه أخف منه).</div>` : '';
-        const emgFree = emergencyFree(r, rows);
-        const emgBtn = emgFree.length || isE(r.sub) ? `<button class="pick adm ${isE(r.sub) ? 'on' : ''}" data-pick="${i}" data-t="${esc(isE(r.sub) ? r.sub : emgFree[0])}" title="${esc(emgFree.map(nm).join('، '))}">🛡 الإدارة تؤمّن${isE(r.sub) ? ': ' + esc(nm(r.sub)) : ''}</button>` : '';
-        const picks = top.length || emgBtn ? `<div class="picks">${top.map((c, k) => `<button class="pick ${c.t.id === r.sub ? 'on' : ''}" data-pick="${i}" data-t="${c.t.id}" title="${esc(c.t.dept)}"><span class="rk">${RANK[k]}</span>${esc(c.t.name.replace(/^أ\.\s*/, ''))}${k === 0 ? '<i>الأنسب</i>' : ''}</button>`).join('')}${emgBtn}</div>` : '';
-        const refusedTxt = (r.refused || []).length ? ` <small class="muted">اعتذر: ${esc(r.refused.map(nm).join('، '))}</small>` : '';
-        const refuseBtn = r.sub && !isE(r.sub) ? ` <button class="link" data-refuse="${i}">اعتذر</button>` : '';
-        return `<tr class="${r.sub ? '' : 'missing'}">
-          <td class="per" data-l="الحصة">${slotLabel(r.slot, r.c)}</td>
-          <td data-l="الصف">${codeHTML(r.c)}</td>
-          <td data-l="المادة">${esc(r.t)}${BREAKS.has(r.slot) ? ' <span class="badge duty">مراقبة</span>' : ''}</td>
-          <td data-l="المؤمِّن">${picks}<select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="الإدارة تؤمّن">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span>${second}${adjW}</td>
-        </tr>`;
-      }).join('');
+    const seen = {};
+    $('#resTable').innerHTML = groupRows(rows).map(g => {
+      const infos = g.rows.map(({ r, i }) => ({ r, i, ...rowInfo(r, i, hist, ctx) }));
+      const ok = infos.filter(x => x.r.sub).length;
+      const head = `<header class="cv-head"><div><b>${esc(nm(g.absent))}</b><span class="cv-kind">${g.kind === 'out' ? 'مستأذن' : 'غائب'}</span></div><small>${esc(byId[g.absent].dept)} · ${arNum(g.rows.length)} ${g.rows.length > 2 ? 'حصص' : 'حصة'}</small><span class="cv-prog ${ok === infos.length ? 'full' : ''}">${arNum(ok)}/${arNum(infos.length)}</span></header>`;
+      return `<section class="cv-grp">${head}${infos.map(({ r, i, cur, warns, st }) => {
+        const sp = slotPlain(r.slot, r.c);
+        const duty = BREAKS.has(r.slot);
+        const anchor = st === 'missing' && !seen.m ? (seen.m = 1, ' id="firstNeed"') : st === 'warn' && !seen.w ? (seen.w = 1, ' id="firstWarn"') : '';
+        const who = !r.sub ? `<b class="nobody">لم يُحدَّد مؤمّن</b><small>اضغط «اختر» وحدد من القائمة</small>`
+          : `<b>${esc(nm(r.sub))}</b><small>${isE(r.sub) ? 'الإدارة تؤمّن هذي الحصة' : cur ? esc(candNote(cur, r)) : ''}${r.m ? ' · اختيارك' : ''}${(r.refused || []).length ? ` · اعتذر: ${esc(r.refused.map(nm).join('، '))}` : ''}</small>`;
+        return `<div class="cv-row st-${st}"${anchor}>
+          <div class="cv-slot"><b>${esc(sp.name)}</b><small><bdi dir="ltr">${sp.time}</bdi></small></div>
+          <div class="cv-class">${duty ? `<span class="cv-duty">مراقبة</span><small>${esc(r.t.replace(/^مراقبة\s*[—-]?\s*/, '') || '')}</small>` : `<b>${codeHTML(r.c)}</b><small>${esc(r.t)}</small>`}</div>
+          <div class="cv-sub">${who}${warns.map(w => `<em class="cv-warn">⚠ ${esc(w)}</em>`).join('')}</div>
+          <button class="cv-btn ${r.sub ? '' : 'pri'}" data-chg="${i}">${r.sub ? 'تغيير' : 'اختر'}</button>
+        </div>`;
+      }).join('')}</section>`;
     }).join('');
-    $('#resTable').innerHTML = `<thead><tr><th>الحصة</th><th>الصف</th><th>المادة</th><th>المعلم المؤمِّن</th></tr></thead><tbody>${body}</tbody>`;
     const cnt = {};
     rows.forEach(r => { if (r.sub) cnt[r.sub] = (cnt[r.sub] || 0) + 1; });
     const lt = Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<span class="lt">${esc(nm(id))} <b>${arNum(n)}</b></span>`).join('');
-    $('#loadToday').innerHTML = lt ? `<span class="muted lt-label">عبء اليوم:</span>${lt}` : '';
+    $('#loadToday').innerHTML = lt ? `<details><summary>عبء اليوم على المعلمين (${arNum(Object.keys(cnt).length)})</summary><div class="lt-list">${lt}</div></details>` : '';
   }
+
+  // نافذة اختيار المؤمّن
+  let pickRow = -1, pickAll = false;
+  function renderPick() {
+    const r = state.rows[pickRow]; if (!r) return;
+    const hist = historyCounts(date), ctx = context();
+    const cs = candidates(r, state.rows, hist, ctx);
+    const list = [...cs.filter(c => !c.over), ...cs.filter(c => c.over)];
+    const shown = pickAll ? list : list.slice(0, 5);
+    const sp = slotPlain(r.slot, r.c);
+    $('#pkHead').innerHTML = `<small>بدل ${esc(nm(r.absent))}</small><b>الحصة ${esc(sp.name)} · ${BREAKS.has(r.slot) ? 'مراقبة' : codeHTML(r.c)}</b><small>${esc(r.t)} · <bdi dir="ltr">${sp.time}</bdi></small>`;
+    const item = (c, k) => {
+      const w = candWarn(c, r, true);
+      return `<button class="pk ${c.t.id === r.sub ? 'on' : ''} ${w.length ? 'has-w' : ''}" data-pk="${c.t.id}"><i>${arNum(k + 1)}</i><span><b>${esc(c.t.name)}${k === 0 && !w.length ? ' <u>الأنسب</u>' : ''}</b><small>${esc(candNote(c, r))}</small>${w.map(x => `<em>⚠ ${esc(x)}</em>`).join('')}</span>${c.t.id === r.sub ? '<s>✓</s>' : ''}</button>`;
+    };
+    const emg = emergencyFree(r, state.rows);
+    if (isE(r.sub) && !emg.includes(r.sub)) emg.unshift(r.sub);
+    $('#pkList').innerHTML = (shown.map(item).join('') || '<p class="muted">ما فيه معلم متاح في هذي الحصة.</p>')
+      + (list.length > 5 && !pickAll ? `<button class="pk-more" data-pkall>عرض الباقين (${arNum(list.length - 5)})</button>` : '')
+      + (emg.length ? `<h4>أو الإدارة تؤمّن</h4><div class="pk-emg">${emg.map(id => `<button class="pk sm ${id === r.sub ? 'on' : ''}" data-pk="${esc(id)}"><span><b>🛡 ${esc(nm(id))}</b></span>${id === r.sub ? '<s>✓</s>' : ''}</button>`).join('')}</div>` : '');
+    $('#pkRefuse').hidden = !(r.sub && !isE(r.sub));
+    $('#pkRefuse').textContent = r.sub ? `${nm(r.sub)} اعتذر ← حوّل للتالي` : '';
+    $('#pkNone').hidden = !r.sub;
+  }
+  function openPick(i) { pickRow = i; pickAll = false; renderPick(); $('#pickModal').hidden = false; }
+  function closePick() { $('#pickModal').hidden = true; pickRow = -1; }
 
   // ---------------- العرض: التبديل ----------------
   // وقت الخروج: من بداية حصة إلى ما قبل حصة الرجوع (أو نهاية الدوام)
@@ -844,32 +894,31 @@
   });
 
   $('#btnRedistribute').addEventListener('click', () => { recompute(true); renderAll(); toast('تمت إعادة التوزيع'); });
-  $('#resTable').addEventListener('click', e => {
-    const b = e.target.closest('[data-refuse]'); if (!b) return;
-    const r = state.rows[+b.dataset.refuse];
-    r.refused = [...(r.refused || []), r.sub];
-    r.m = false;
-    assignOne(r, state.rows, historyCounts(date), context());
-    commit(); renderResults();
-    toast(isE(r.sub) ? `ما فيه معلم متاح — انتقلت للطوارئ: ${nm(r.sub)}` : r.sub ? `تم التحويل إلى ${nm(r.sub)}` : 'ما فيه أحد متاح لهالحصة');
+  $('#resTable').addEventListener('click', e => { const b = e.target.closest('[data-chg]'); if (b) openPick(+b.dataset.chg); });
+  $('#pickModal').addEventListener('click', e => {
+    if (e.target.id === 'pickModal' || e.target.closest('[data-pkclose]')) return closePick();
+    if (e.target.closest('[data-pkall]')) { pickAll = true; return renderPick(); }
+    const r = state.rows[pickRow]; if (!r) return;
+    const pk = e.target.closest('[data-pk]');
+    if (pk) { r.sub = pk.dataset.pk; r.m = true; commit(); renderResults(); closePick(); toast(`المؤمّن: ${nm(r.sub)}`); return; }
+    if (e.target.closest('#pkNone')) { r.sub = ''; r.m = true; commit(); renderResults(); renderPick(); return; }
+    if (e.target.closest('#pkRefuse')) {
+      r.refused = [...(r.refused || []), r.sub]; r.m = false;
+      assignOne(r, state.rows, historyCounts(date), context());
+      commit(); renderResults(); renderPick();
+      toast(isE(r.sub) ? `ما فيه معلم متاح — انتقلت للإدارة: ${nm(r.sub)}` : r.sub ? `تم التحويل إلى ${nm(r.sub)}` : 'ما فيه أحد متاح لهالحصة');
+    }
   });
-  $('#resTable').addEventListener('click', e => {
-    const b = e.target.closest('[data-pick]'); if (!b) return;
-    const r = state.rows[+b.dataset.pick];
-    r.sub = r.sub === b.dataset.t && db.settings.coverMode === 'manual' ? '' : b.dataset.t; r.m = !!r.sub;
-    commit(); renderResults();
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#pickModal').hidden) closePick(); });
+  $('#daySum').addEventListener('click', e => {
+    const g = e.target.closest('[data-go]'); if (!g) return;
+    const el = document.getElementById(g.dataset.go); if (el && !el.hidden) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-mode]'); if (!b) return;
     db.settings[b.dataset.key] = b.dataset.mode; persist(); cloudConfig();
     recompute(); renderAll(); renderModes();
     toast(b.dataset.mode === 'manual' ? 'صار الاختيار يدوي — اختر من المرتّبين' : 'صار التوزيع تلقائي');
-  });
-  $('#resTable').addEventListener('change', e => {
-    const sel = e.target.closest('select[data-row]'); if (!sel) return;
-    const r = state.rows[+sel.dataset.row];
-    r.sub = sel.value; r.m = true;
-    commit(); renderResults();
   });
   if (!claudeHost) { $('#btnPrint').hidden = false; $('#btnSwapPrint').hidden = false; }
   $('#btnPrint').addEventListener('click', () => printDay(date, state));
@@ -985,12 +1034,12 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) $('#modalNo').click(); });
 
   // ---------------- واجهة للتطبيق الثلاثي (sync-admin.js) ----------------
-  const slotPlain = (s, code) => { const iv = ivOf(s, code); return { name: SLOT_NAME[s] || s, time: `${hm(iv[0])}–${hm(iv[1])}` }; };
   window.APT = {
     T, byId, nm, isE, DAYS, slotPlain, supOf, supAllows, supLabel, BREAK_GRADES, weekdayName, fmtG, fmtH, isoOf, toast, ask, esc,
     get date() { return date; },
     get state() { return state; },
     get settings() { return db.settings; },
+    refreshSum() { if (D() !== -1) renderSummary(); },
     saveSettings() { persist(); cloudConfig(); },
     // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
     ranked(row) { const cs = candidates(row, state.rows, historyCounts(date), context()); return [...cs.filter(c => !c.over), ...cs.filter(c => c.over)].map(c => c.t.id); },

@@ -138,6 +138,7 @@
     $('#respDay').textContent = `${A.weekdayName(iso)} ${A.fmtG(iso)}`;
     $('#btnSend').textContent = sent ? 'إعادة الإرسال' : 'إرسال تأمين اليوم للمعلمين';
     document.querySelectorAll('[data-send-now]').forEach(b => { b.textContent = sent ? '✓ انرسل — إعادة الإرسال' : '📲 إرسال للمعلمين'; b.classList.toggle('done', sent); });
+    if (A.refreshSum) A.refreshSum();
     $('#sendNote').textContent = !n ? 'ما فيه تأمين أو تبديل لهذا اليوم. اختر الغائبين من «تأمين اليوم».'
       : sent ? `انرسل. أي تعديل على التأمين يوصل للمعلمين تلقائيًا، ولو اعتذر أحد يتحوّل للبديل اللي بعده.`
         : `${n} مهمة جاهزة للإرسال.`;
