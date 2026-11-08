@@ -455,8 +455,9 @@
     const picked = new Set();
     const v = await sheet(`<div class="sh-ic">⇄</div><h3>طلب تبديل حصة</h3>
       <p class="sh-sum">اختر اليوم والحصص اللي تبي تبدّلها. الإدارة ترتّب لك زميلًا يدرّس <b>نفس الصف</b>: يدخل حصتك، وتدخل أنت حصته في وقت ثاني من نفس اليوم.</p>
-      <p class="lbl">اليوم <span class="req">*</span></p><input type="date" id="rqDate" class="rq-in" min="${TODAY}" value="${def}">
-      <p class="lbl">الحصص <span class="req">*</span></p><div class="reasons rq-per" id="rqPer">${Object.entries(PER).map(([k, n]) => `<button type="button" data-p="${k}">${n}</button>`).join('')}</div>
+      <p class="lbl">اليوم <span class="req">*</span></p><input type="date" id="rqDate" class="rq-in" min="${TODAY}" value="${def}"><p class="rq-sel" id="rqDay"></p>
+      <p class="lbl">الحصص <span class="req">*</span> <small class="muted">— اضغط الحصة لاختيارها، ومرة ثانية لإلغائها</small></p><div class="rq-per" id="rqPer">${Object.entries(PER).map(([k, n]) => `<button type="button" data-p="${k}" aria-pressed="false"><i>${k}</i>${n}</button>`).join('')}</div>
+      <p class="rq-sel" id="rqSel">ما اخترت حصة بعد</p>
       <p class="lbl">السبب <span class="req">*</span></p><textarea id="rqWhy" rows="2" placeholder="مثال: موعد رسمي، ظرف عائلي…"></textarea>
       <p class="lbl">زميل تقترحه <small class="muted">(اختياري)</small></p><input id="rqWho" class="rq-in" placeholder="اسم الزميل إن اتفقت معه">
       <p class="err" id="rqErr"></p>
@@ -468,7 +469,23 @@
         return { date, reason, slots: [...picked].sort(), prefer: $('#rqWho').value.trim() };
       }
     }, () => {
-      $('#rqPer').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; SND('tap'); picked.has(b.dataset.p) ? picked.delete(b.dataset.p) : picked.add(b.dataset.p); b.classList.toggle('on', picked.has(b.dataset.p)); $('#rqErr').textContent = ''; };
+      const dayTxt = () => { const v = $('#rqDate').value; $('#rqDay').innerHTML = v ? `يوم <b>${weekdayAr(v)}</b> ${new Intl.DateTimeFormat('ar', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(v + 'T12:00'))}` : ''; };
+      $('#rqDate').oninput = $('#rqDate').onchange = dayTxt; dayTxt();
+      let lastT = 0, lastP = '';
+      const paint = () => {
+        $('#rqPer').querySelectorAll('[data-p]').forEach(x => { const on = picked.has(x.dataset.p); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); });
+        const l = [...picked].sort().map(perName);
+        $('#rqSel').innerHTML = l.length ? `اخترت ${l.length === 1 ? 'حصة' : l.length + ' حصص'}: <b>${l.join('، ')}</b>` : 'ما اخترت حصة بعد';
+      };
+      $('#rqPer').onclick = e => {
+        const b = e.target.closest('[data-p]'); if (!b) return;
+        e.preventDefault(); e.stopPropagation();
+        const t = Date.now(); if (b.dataset.p === lastP && t - lastT < 350) return; // ضغطة مكررة من اللمس
+        lastT = t; lastP = b.dataset.p;
+        SND('tap'); buzz(8);
+        picked.has(b.dataset.p) ? picked.delete(b.dataset.p) : picked.add(b.dataset.p);
+        b.blur(); paint(); $('#rqErr').textContent = '';
+      };
     });
     if (!v) return;
     await S.add('msgs', { type: 'req', tid: ME, name: me.name, from: 'teacher', ...v, status: 'pending', at: now(), readA: false, readT: true });

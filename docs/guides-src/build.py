@@ -92,6 +92,7 @@ th{background:#4d0610;color:#f6d690;font-weight:600}
 .sigs{display:flex;justify-content:space-around;gap:4mm;text-align:center}
 .sigs div{flex:1;font-size:9.5pt;color:#5a4a40}
 .sigs b{display:block;font-family:Amiri;font-size:13.5pt;color:#4d0610;margin-top:1mm;min-height:7mm}
+.sigs>div{border-inline-start:1px solid #e5d3ae}.sigs>div:first-child{border:0}
 .crop{overflow:hidden}
 """
 
@@ -99,10 +100,12 @@ def name_or_line(n):
     return n if n.strip() else '<span style="display:inline-block;width:40mm;border-bottom:1px dotted #8a7560">&nbsp;</span>'
 
 def sign_block():
-    a = cfg['assistants'] or ['']
-    sigs = ''.join(f'<div>المدير المساعد<b>{name_or_line(x)}</b></div>' for x in a)
-    sigs += f'<div>مدير المدرسة<b>{name_or_line(cfg["principal"])}</b></div>'
-    return f'''<div class="sign"><div class="prep">إعداد<br><b>{name_or_line(cfg["prepared"])}</b></div><div class="sigs">{sigs}</div></div>'''
+    a = [x for x in cfg['assistants'] if x.strip()] or ['']
+    asst = ''.join(f'<b>{name_or_line(x)}</b>' for x in a)
+    return f'''<div class="sign"><div class="sigs">
+<div>إعداد<b>{name_or_line(cfg["prepared"])}</b></div>
+<div>{'المديران المساعدان' if len(a) > 1 else 'المدير المساعد'}{asst}</div>
+<div>مدير المدرسة<b>{name_or_line(cfg["principal"])}</b></div></div></div>'''
 
 def top(title):
     return f'<div class="top"><span class="t">{title}</span><img src="file://{APP}/assets/header.jpg"></div>'
@@ -129,7 +132,7 @@ def ios_steps():
     m2 = f'''<div class="mock"><div class="url">ap-taameen.web.app/app/</div><div class="pg"><img src="{ICON}"></div>
 <div class="sheet"><div class="row"><i>⧉</i>نسخ</div><div class="row"><i>☆</i>إضافة إلى المفضلة</div><div class="row hl"><i>⊞</i><b>إضافة إلى الشاشة الرئيسية</b></div><div class="row"><i>🖨</i>طباعة</div></div></div>
 <div class="mcap"><span class="stepn">2</span>انزل واختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم <b>«إضافة»</b></div>'''
-    m3 = home_mock('3', 'تطلع أيقونة <b>التأمين</b> على الشاشة، افتحها مثل أي تطبيق')
+    m3 = home_mock('3', 'تطلع أيقونة <b>«تأمين وتبديل»</b> على الشاشة، افتحها مثل أي تطبيق')
     return f'<div class="grid3">{wrap(m1)}{wrap(m2)}{wrap(m3)}</div>'
 
 def android_steps():
@@ -143,7 +146,7 @@ def android_steps():
 
 def home_mock(n, cap):
     aps = ''.join('<div class="ap"><span></span>&nbsp;</div>' for _ in range(5))
-    return f'''<div class="mock"><div class="home">{aps}<div class="ap"><img class="hl" src="{ICON}">التأمين</div>{''.join('<div class="ap"><span></span>&nbsp;</div>' for _ in range(6))}</div></div>
+    return f'''<div class="mock"><div class="home">{aps}<div class="ap"><img class="hl" src="{ICON}">تأمين وتبديل</div>{''.join('<div class="ap"><span></span>&nbsp;</div>' for _ in range(6))}</div></div>
 <div class="mcap"><span class="stepn">{n}</span>{cap}</div>'''
 
 def wrap(x): return f'<div>{x}</div>'
