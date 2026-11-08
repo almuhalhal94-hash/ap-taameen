@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>تأمين ابن رشد</title>
-<meta name="theme-color" content="#4d0610">
+<meta name="theme-color" content="#2b0408">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="تأمين ابن رشد">
@@ -14,32 +14,50 @@
 </head>
 <body>
 <div class="shell" id="shell">
-  <header class="top">
-    <div class="brand"><span class="logo">ر</span><div><small>مدرسة ابن رشد الإعدادية للبنين</small><b>التأمين والتبديل</b></div></div>
-    <div class="me"><small id="today"></small><b id="myName">…</b></div>
+  <header class="top" id="top" hidden>
+    <div class="brand"><span class="logo">ر</span><div><small>مدرسة ابن رشد الإعدادية للبنين</small><b id="roleTitle">التأمين والتبديل</b></div></div>
+    <button class="me" id="meBtn" aria-label="الحساب"><small id="today"></small><b id="myName">…</b></button>
   </header>
 
   <main id="views">
-    <section class="view active" id="v-tasks">
+    <!-- الدخول بالرمز -->
+    <section class="view" id="v-login">
+      <div class="login">
+        <div class="login-logo">ر</div>
+        <h1>التأمين والتبديل</h1>
+        <p>مدرسة ابن رشد الإعدادية للبنين</p>
+        <form id="loginForm" autocomplete="off">
+          <label for="codeIn">أدخل رمزك الخاص</label>
+          <div class="code-boxes" id="codeBoxes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <input id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="رمز الدخول">
+          <button class="btn-main" id="loginBtn" disabled>دخول</button>
+          <p class="err" id="loginErr"></p>
+        </form>
+        <p class="login-note">الرمز يوصلك من المدير المساعد. لا تشاركه مع أحد.</p>
+      </div>
+    </section>
+
+    <section class="view" id="v-tasks">
+      <div class="hello" id="hello"></div>
       <div class="stack-wrap">
         <div class="stack" id="stack"></div>
         <div class="empty" id="emptyTasks" hidden>
           <div class="empty-ic">✓</div>
-          <b>ما عندك مهام جديدة</b>
+          <b>ما عندك تكليفات جديدة</b>
           <p>أي تأمين أو مراقبة أو تبديل يخصك يطلع هنا أول ما ترسله الإدارة.</p>
         </div>
         <div class="acts" id="acts" hidden>
-          <button class="act no" id="btnNo" aria-label="اعتذار"><span>✕</span>اعتذار</button>
-          <button class="act yes" id="btnYes" aria-label="قبول"><span>✓</span>قبول</button>
+          <button class="act no" id="btnNo"><span>!</span>عندي عذر رسمي</button>
+          <button class="act yes" id="btnYes"><span>✓</span>استلمت التكليف</button>
         </div>
-        <p class="swipe-hint" id="swipeHint" hidden>اسحب البطاقة <b class="y">يمين للقبول</b> أو <b class="n">يسار للاعتذار</b></p>
+        <p class="swipe-hint" id="swipeHint" hidden>اسحب البطاقة <b class="y">يمين للاستلام</b> · <b class="n">يسار للاعتذار بعذر رسمي</b></p>
       </div>
-      <h3 class="sec">المؤكدة</h3>
+      <h3 class="sec" id="doneHead">تكليفاتي</h3>
       <div id="doneList" class="list"></div>
     </section>
 
     <section class="view" id="v-sup">
-      <p class="lead" id="supLead"></p>
+      <div class="sup-head"><p class="lead" id="supLead"></p><div class="sum" id="supSum"></div></div>
       <div id="supList" class="list"></div>
     </section>
 
@@ -49,36 +67,31 @@
 
     <section class="view" id="v-chat">
       <div class="chat">
-        <div class="chat-h">المحادثة مع الإدارة <small>(تنحفظ موثّقة عند المدير المساعد)</small></div>
+        <div class="chat-h">المحادثة مع الإدارة <small>تنحفظ موثّقة عند المدير المساعد</small></div>
         <div class="chat-body" id="chatBody"></div>
         <form class="chat-in" id="chatForm"><input id="chatText" placeholder="اكتب رسالة…" autocomplete="off"><button aria-label="إرسال">➤</button></form>
       </div>
     </section>
-
-    <section class="view" id="v-bad">
-      <div class="empty"><div class="empty-ic">!</div><b>الرابط غير صحيح</b><p>اطلب رابطك الخاص من المدير المساعد.</p></div>
-    </section>
   </main>
 
-  <nav class="bar" id="bar">
-    <button class="on" data-v="tasks"><i>▤</i>مهامي<span class="nb" id="nbTasks" hidden></span></button>
-    <button data-v="sup" id="tabSup" hidden><i>◉</i>المشرف<span class="nb" id="nbSup" hidden></span></button>
-    <button data-v="exp"><i>✎</i>الاستيضاح<span class="nb" id="nbExp" hidden></span></button>
+  <nav class="bar" id="bar" hidden>
+    <button data-v="tasks" id="tabTasks"><i>▤</i>تكليفاتي<span class="nb" id="nbTasks" hidden></span></button>
+    <button data-v="sup" id="tabSup" hidden><i>◉</i>المتابعة<span class="nb" id="nbSup" hidden></span></button>
+    <button data-v="exp" id="tabExp"><i>✎</i>الاستيضاح<span class="nb" id="nbExp" hidden></span></button>
     <button data-v="chat"><i>✉</i>المحادثة<span class="nb" id="nbChat" hidden></span></button>
   </nav>
   <div class="demo" id="demoNote" hidden>وضع تجربة — على هذا الجهاز فقط</div>
-  <button class="notif" id="btnNotif" hidden>🔔 فعّل التنبيهات</button>
+  <button class="notif" id="btnNotif" hidden>🔔 فعّل التنبيهات عشان يوصلك التكليف</button>
 </div>
 
+<!-- نافذة التأكيد / الاعتذار -->
 <div class="sheet-bg" id="sheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
-    <h3 id="sheetT">الاعتذار</h3>
-    <p class="muted">يوصل للمدير المساعد فقط. السبب اختياري.</p>
-    <div class="chips" id="whyChips"><button>عندي حصة</button><button>ظرف طارئ</button><button>مريض</button><button>خارج المدرسة</button></div>
-    <textarea id="whyText" rows="2" placeholder="سبب آخر…"></textarea>
-    <div class="sheet-btns"><button class="b-no" id="sheetSend">إرسال الاعتذار</button><button class="b-ghost" id="sheetBack">تراجع</button></div>
+    <div class="grab"></div>
+    <div id="sheetBody"></div>
   </div>
 </div>
+<div class="snack" id="snack" role="status" aria-live="polite"><span id="snackTxt"></span><button id="snackUndo">تراجع</button><i id="snackBar"></i></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="../firebase-config.js"></script>

@@ -122,7 +122,7 @@
     if (docs.length && docs[0].date === A.date) {
       lockPublished();   // اللي انرسل ما يتغيّر صاحبه إذا انعاد التوزيع
       for (const d of docs) {
-        if (d.status === 'cancelled' || !(d.refused || []).length) continue;
+        if (d.status === 'cancelled' || !(d.log || []).some(l => l.act !== 'accepted' && l.act !== 'reassigned')) continue;
         const next = d.kind === 'swap' ? (d.to ? { b: d.to, s2: d.s2, t2: d.t2 } : null) : (d.to || null);
         A.applyRefusal(d.date, { kind: d.kind, absent: d.absent, slot: d.slot }, d.refused, next);
       }
@@ -151,7 +151,8 @@
     if (!list.length) { $('#respList').innerHTML = `<p class="muted">${docs.length ? 'لا يوجد في هذا التصنيف.' : 'ما انرسل شي لهذا اليوم بعد.'}</p>`; return; }
     $('#respList').innerHTML = list.map(d => {
       const ref = (d.refused || []).map(id => `<span class="who bad">${esc((d.names || {})[id] || tName(id))} <button class="link" data-exp="${d.id}" data-t="${id}" data-r="${d.kind === 'swap' ? 'swap' : 'refuse'}">استيضاح</button></span>`).join('');
-      const notes = (d.log || []).filter(l => l.act === 'rejected' && l.note).map(l => `<div class="rnote">«${esc(l.note)}» — ${esc(l.name)}</div>`).join('');
+      const ACT = { rejected: 'اعتذر', returned: 'تراجع عن اعتذاره وسيحضر', undo: 'تراجع خلال ثوانٍ', withdrew: 'اعتذر بعد القبول' };
+      const notes = (d.log || []).filter(l => ACT[l.act] && (l.note || l.act !== 'rejected')).map(l => `<div class="rnote">${esc(l.name)}: ${ACT[l.act]}${l.note ? ` — «${esc(l.note)}»` : ''} <small>${fmtTime(l.at)}</small></div>`).join('');
       const who = d.to ? esc(d.toName) : d.emg ? `${esc(d.emg)} <small>(طوارئ)</small>` : '<span class="muted">بدون مؤمّن</span>';
       const st = d.to ? `<span class="st ${d.status}">${d.status === 'accepted' ? '✓ قبل' : 'بانتظار الرد'}</span>` : '';
       const what = d.kind === 'swap'
@@ -162,7 +163,7 @@
         <div class="rw">${what}</div>
         <div class="rto">المكلّف: <b>${who}</b> ${st} ${d.auto ? '<span class="st auto">بديل تلقائي</span>' : ''}
           ${d.to ? `<button class="link" data-exp="${d.id}" data-t="${d.to}" data-r="${d.kind === 'duty' ? 'duty' : d.kind === 'swap' ? 'swapabs' : 'cover'}">استيضاح عدم حضور</button>` : ''}</div>
-        ${ref ? `<div class="rref">اعتذر: ${ref}</div>${notes}` : ''}
+        ${ref ? `<div class="rref">اعتذر: ${ref}</div>` : ''}${notes}
       </div>`;
     }).join('');
   }
@@ -276,29 +277,52 @@
     await S.add('msgs', { tid: openT, from: 'admin', text: t, at: now(), readA: true, readT: false });
   });
 
-  // ---------------- روابط المعلمين ----------------
-  const keys = () => (A.settings.keys = A.settings.keys || {});
-  const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
-  const linkOf = k => new URL('app/?k=' + k, location.href.split('#')[0]).href;
+  // ---------------- رموز الدخول ----------------
+  // لكل معلم رمز من 6 أرقام، ولكل مشرف رمز ثاني يفتح له شاشة المتابعة
+  const APP_URL = new URL('app/', location.href.split('#')[0].split('?')[0]).href;
+  const codes = () => (A.settings.codes = A.settings.codes || {});
+  const supCodes = () => (A.settings.supCodes = A.settings.supCodes || {});
+  const isSup = id => A.supOf(id).length > 0;
+  const newCode = used => { let c; do { c = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); } while (used.has(c)); used.add(c); return c; };
+  const short = n => n.replace(/^أ\.\s*/, '');
+  const msgFor = t => {
+    const c = codes()[t.id], sc = supCodes()[t.id];
+    return `السلام عليكم ${t.name}\nتطبيق التأمين والتبديل — مدرسة ابن رشد:\n${APP_URL}\nرمز دخولك: ${c}${sc ? `\nرمز المشرف (متابعة صفوفك): ${sc}` : ''}\nالرمز خاص بك، فضلًا لا تشاركه.`;
+  };
   function renderLinks() {
-    const K = keys();
-    if (!Object.keys(K).length) { $('#linkList').innerHTML = '<p class="muted">اضغط «تجهيز الروابط».</p>'; return; }
-    $('#linkList').innerHTML = [...A.T].sort((a, b) => a.name.localeCompare(b.name, 'ar')).filter(t => K[t.id]).map(t =>
-      `<div class="lk"><b>${esc(t.name)}</b>${A.supOf(t.id).length ? ' <span class="st auto">مشرف</span>' : ''}<span class="btn-row"><button class="btn sm" data-copy="${t.id}">نسخ</button><a class="btn sm" href="${linkOf(K[t.id])}" target="_blank" rel="noopener">فتح</a></span></div>`).join('');
+    const C = codes(), SC = supCodes();
+    if (!Object.keys(C).length) { $('#linkList').innerHTML = '<p class="muted">اضغط «تجهيز الرموز».</p>'; return; }
+    $('#linkList').innerHTML = `<p class="hint">رابط التطبيق للجميع: <b dir="ltr">${esc(APP_URL)}</b> — وكل واحد يدخل برمزه.</p>` + [...A.T].sort((a, b) => a.name.localeCompare(b.name, 'ar')).filter(t => C[t.id]).map(t =>
+      `<div class="lk"><b>${esc(t.name)}</b><span class="codes"><span class="code-pill" title="رمز المعلم">${C[t.id]}</span>${SC[t.id] ? `<span class="code-pill sup" title="رمز المشرف">مشرف ${SC[t.id]}</span>` : ''}</span><span class="btn-row"><button class="btn sm" data-copy="${t.id}">نسخ الرسالة</button></span></div>`).join('');
   }
-  async function makeLinks() {
-    const K = keys();
-    A.T.forEach(t => { if (!K[t.id]) K[t.id] = rnd(); });
+  async function makeCodes(again) {
+    const C = codes(), SC = supCodes();
+    if (again && !(await A.ask('تجديد كل الرموز؟ الرموز القديمة تتوقف، ولازم ترسل الجديدة لكل المعلمين.', 'تجديد'))) return;
+    const used = new Set([...Object.values(C), ...Object.values(SC)]);
+    const old = again ? [...Object.values(C), ...Object.values(SC)] : [];
+    if (again) { A.settings.codes = {}; A.settings.supCodes = {}; used.clear(); }
+    const C2 = codes(), SC2 = supCodes();
+    A.T.forEach(t => { if (!C2[t.id]) C2[t.id] = newCode(used); if (isSup(t.id) && !SC2[t.id]) SC2[t.id] = newCode(used); if (!isSup(t.id)) delete SC2[t.id]; });
     A.saveSettings();
-    for (const t of A.T) await S.put('people/' + K[t.id], { tid: t.id, name: t.name, sup: A.supOf(t.id).length > 0, supLabel: A.supLabel(t.id) });
-    renderLinks(); A.toast('الروابط جاهزة');
+    $('#btnLinks').disabled = true;
+    try {
+      for (const t of A.T) {
+        await S.put('people/' + C2[t.id], { tid: t.id, name: t.name, role: 'teacher', sup: false });
+        if (SC2[t.id]) await S.put('people/' + SC2[t.id], { tid: t.id, name: t.name, role: 'sup', sup: true, supLabel: A.supLabel(t.id) });
+      }
+      for (const c of old) await S.put('people/' + c, { revoked: true });
+      A.toast('الرموز جاهزة');
+    } catch (e) { A.toast('تعذّر الحفظ — تأكد من الاتصال'); }
+    $('#btnLinks').disabled = false;
+    renderLinks();
   }
-  $('#btnLinks').addEventListener('click', makeLinks);
+  $('#btnLinks').addEventListener('click', () => makeCodes(false));
+  $('#btnRenew').addEventListener('click', () => makeCodes(true));
   const copy = async txt => { try { await navigator.clipboard.writeText(txt); A.toast('تم النسخ'); } catch (e) { prompt('انسخ:', txt); } };
-  $('#linkList').addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copy(linkOf(keys()[b.dataset.copy])); });
+  $('#linkList').addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copy(msgFor(A.byId[b.dataset.copy])); });
   $('#btnCopyAll').addEventListener('click', () => {
-    const K = keys(); if (!Object.keys(K).length) return A.toast('جهّز الروابط أول');
-    copy([...A.T].filter(t => K[t.id]).map(t => `${t.name}: ${linkOf(K[t.id])}`).join('\n'));
+    const C = codes(); if (!Object.keys(C).length) return A.toast('جهّز الرموز أول');
+    copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${supCodes()[t.id] ? ` — مشرف: ${supCodes()[t.id]}` : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
   });
 
   // ---------------- الشارة ----------------

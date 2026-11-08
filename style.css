@@ -328,3 +328,23 @@ a.btn{text-decoration:none}
 .ps-letter{white-space:normal;margin:18px 0;font-size:14.5px;line-height:2}
 .ps-reply{border:1px solid #555;min-height:120px;padding:10px 12px;line-height:1.9}
 .ps-foot.three>div{min-width:28%}
+
+/* ===== التلقائي / اليدوي وترتيب الأفضلية ===== */
+.mode-seg{display:inline-flex;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px;margin:6px 0 0}
+.mode-seg button{border:0;background:none;color:var(--ink);font:inherit;font-size:.85rem;padding:6px 14px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s}
+.mode-seg button.on{background:linear-gradient(135deg,var(--red2),var(--red));color:#fff;box-shadow:0 2px 8px rgba(122,10,22,.3)}
+.mode-note{margin:.3rem 0 0}
+.mode-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:.9rem}
+.mode-row .mode-seg{margin:0}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.pick{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:5px 10px 5px 8px;font:inherit;font-size:.84rem;cursor:pointer;transition:transform .12s,border-color .2s,background .2s}
+.pick:hover{border-color:var(--gold);transform:translateY(-1px)}
+.pick .rk{font-size:.68rem;font-weight:700;color:var(--muted);background:var(--chip);border-radius:6px;padding:0 6px}
+.pick i{font-style:normal;font-size:.66rem;color:var(--ok);border:1px solid currentColor;border-radius:999px;padding:0 6px}
+.pick.on{background:linear-gradient(135deg,var(--red2),var(--red));color:#fff;border-color:transparent}
+.pick.on .rk{background:rgba(255,255,255,.2);color:#fff}.pick.on i{color:#fff}
+.pick small{opacity:.75}
+.badge.duty{background:rgba(184,134,43,.15);color:var(--warn)}
+.codes{display:inline-flex;gap:6px;margin-inline-start:auto;margin-inline-end:10px}
+.code-pill{font-family:"Readex",monospace;font-weight:700;letter-spacing:2px;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:1px 8px;direction:ltr}
+.code-pill.sup{background:rgba(184,134,43,.12);color:var(--warn);letter-spacing:1px}

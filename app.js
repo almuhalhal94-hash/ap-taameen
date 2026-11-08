@@ -50,10 +50,12 @@
     })));
   })();
   T.forEach(t => { t.teaching = Object.values(t.cells).filter(c => !NON_TEACHING.has(c.t)).length; });
+  // معلمو مراقبة الفسحة (لهم مراقبة في جدول الفسحتين)
+  const DUTY_T = new Set(T.filter(t => Object.values(t.cells).some(c => c.t === 'مراقبة')).map(t => t.id));
 
   // ---------------- التخزين ----------------
   const defaults = () => ({
-    settings: { principal: '', assistant: '', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم' },
+    settings: { principal: '', assistant: '', coverMode: 'auto', swapMode: 'auto', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم' },
     avail: {},     // tid -> {released, days}
     history: {}    // 'YYYY-MM-DD' -> {absent:{tid:[slots]}, rows:[], swaps:[], savedAt}
   });
@@ -270,12 +272,13 @@
 
   // ---------------- العدّ من السجل ----------------
   function historyCounts(excludeDate) {
-    const cnt = {}, abs = {}, last = {}, swA = {}, swB = {}, ref = {};
+    const cnt = {}, abs = {}, last = {}, swA = {}, swB = {}, ref = {}, duty = {};
     let emg = 0;
     for (const [iso, h] of Object.entries(db.history)) {
       if (iso === excludeDate) continue;
       for (const r of h.rows || []) (r.refused || []).forEach(x => { ref[x] = (ref[x] || 0) + 1; });
       for (const r of h.rows || []) if (r.sub && isE(r.sub)) emg++;
+      for (const r of h.rows || []) if (r.sub && !isE(r.sub) && BREAKS.has(r.slot)) duty[r.sub] = (duty[r.sub] || 0) + 1;
       for (const r of h.rows || []) if (r.sub && !isE(r.sub)) { cnt[r.sub] = (cnt[r.sub] || 0) + 1; if (!last[r.sub] || iso > last[r.sub]) last[r.sub] = iso; }
       for (const tid of Object.keys(h.absent || {})) abs[tid] = (abs[tid] || 0) + 1;
       for (const sw of h.swaps || []) {
@@ -283,7 +286,7 @@
         for (const it of sw.items) if (it.b) swB[it.b] = (swB[it.b] || 0) + 1;
       }
     }
-    return { cnt, abs, last, swA, swB, ref, emg };
+    return { cnt, abs, last, swA, swB, ref, emg, duty };
   }
 
   // ---------------- التبديل ----------------
@@ -318,6 +321,7 @@
         if (ok) { it.t2 = ok.t2; continue; }
         if (it.b && it.m) it.m = false;   // اختيار يدوي صار غير ممكن
         if (it.none) { it.b = ''; continue; }
+        if (db.settings.swapMode === 'manual' && !it.m) { Object.assign(it, { b: '', s2: '', t2: '' }); continue; }
         const best = opts[0];
         Object.assign(it, best ? { b: best.b, s2: best.s2, t2: best.t2 } : { b: '', s2: '', t2: '' });
       }
@@ -332,7 +336,7 @@
     }
     for (const sw of state.swaps) {
       if (ctx.absentSet.has(sw.a)) continue;
-      for (const it of sw.items) if (!it.b) list.push({ slot: it.s, c: it.c, t: it.t, absent: sw.a, kind: 'out' });
+      for (const it of sw.items) if (!it.b && (it.none || db.settings.swapMode !== 'manual')) list.push({ slot: it.s, c: it.c, t: it.t, absent: sw.a, kind: 'out' });
       // مراقبة الفسحة اللي تصادف وقت خروجه
       if (db.settings.coverBreak) for (const s of ['B1', 'B2']) {
         const c = ctx.cell(sw.a, s);
@@ -357,8 +361,9 @@
     const s = row.slot, iv = ivOf(s, row.c);
     const absT = byId[row.absent];
     const taken = new Set(rows.filter(r => r !== row && r.sub && overlap(ivOf(r.slot, r.c), iv)).map(r => r.sub));
+    const isB = BREAKS.has(s);
     const tc = {}, extra = {};
-    rows.forEach(r => { if (r !== row && r.sub) { tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
+    rows.forEach(r => { if (r !== row && r.sub) { if (BREAKS.has(r.slot) === isB) tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
     const list = T.filter(t => presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOutIv(t.id, iv) && !ctx.busyIv(t.id, iv) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c, s));
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
@@ -366,6 +371,11 @@
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
       const run = BREAKS.has(s) ? 0 : runAfter(ctx, t.id, s, (extra[t.id] || []).filter(x => !BREAKS.has(x)));
+      if (isB) {
+        // بديل المراقبة: من معلمي المراقبة أولًا، والأخف نصابًا (اليوم ثم الأسبوع)، وواحدة باليوم
+        const over = n >= 1, duty = DUTY_T.has(t.id);
+        return { t, h, n, same, load, run, over, duty, swp: inSwap.has(t.id), key: [over ? 1 : 0, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
+      }
       const over = n >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 3 ? 1 : 0;
@@ -399,7 +409,7 @@
     rows.filter(r => r.m).forEach(r => { if (r.sub && !(isE(r.sub) ? emergencyFree(r, rows).includes(r.sub) : candidates(r, rows, hist, ctx).some(c => c.t.id === r.sub))) { r.sub = ''; r.m = false; } });
     const pending = rows.filter(r => !r.m);
     pending.forEach(r => { r.sub = ''; });
-    while (pending.length) {
+    while (pending.length && db.settings.coverMode !== 'manual') {
       pending.forEach(r => { r._n = candidates(r, rows, hist, ctx).filter(c => !c.over).length; });
       pending.sort((a, b) => a._n - b._n || slotIdx(a.slot) - slotIdx(b.slot));
       const r = pending.shift();
@@ -481,7 +491,14 @@
     return arr.sort((a, b) => slotIdx(a.rows[0].r.slot) - slotIdx(b.rows[0].r.slot));
   }
 
+  const RANK = ['الأول', 'الثاني', 'الثالث', 'الرابع'];
+  function renderModes() {
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', db.settings[b.dataset.key] === b.dataset.mode));
+    $('#coverModeNote').textContent = db.settings.coverMode === 'manual' ? 'اختر لكل حصة من المرتّبين حسب الأولوية (الأول هو الأنسب).' : 'النظام يختار الأنسب تلقائيًا، وتقدر تغيّر أي حصة بضغطة.';
+    $('#swapModeNote').textContent = db.settings.swapMode === 'manual' ? 'اختر البديل لكل حصة من المرتّبين حسب الأولوية.' : 'النظام يختار أنسب بديل تلقائيًا، وتقدر تغيّره.';
+  }
   function renderResults() {
+    renderModes();
     const rows = state.rows;
     $('#resultCard').hidden = !rows.length;
     if (!rows.length) { $('#loadToday').innerHTML = ''; return; }
@@ -497,13 +514,15 @@
         const emg = emergencyFree(r, rows).map(id => `<option value="${esc(id)}" ${id === r.sub ? 'selected' : ''}>${esc(nm(id))}</option>`).join('');
         const cur = cands.find(c => c.t.id === r.sub);
         const badge = !r.sub ? '<span class="badge none">بدون مؤمِّن</span>' : isE(r.sub) ? '<span class="badge emg">طوارئ</span>' : cur && cur.same ? '<span class="badge dept">من القسم</span>' : '<span class="badge other">من قسم آخر</span>';
+        const top = cands.filter(c => !c.over).slice(0, 4);
+        const picks = top.length ? `<div class="picks">${top.map((c, k) => `<button class="pick ${c.t.id === r.sub ? 'on' : ''}" data-pick="${i}" data-t="${c.t.id}" title="${esc(c.t.dept)}"><span class="rk">${RANK[k]}</span>${esc(c.t.name.replace(/^أ\.\s*/, ''))}${k === 0 ? '<i>الأنسب</i>' : ''}</button>`).join('')}</div>` : '';
         const refusedTxt = (r.refused || []).length ? ` <small class="muted">اعتذر: ${esc(r.refused.map(nm).join('، '))}</small>` : '';
         const refuseBtn = r.sub && !isE(r.sub) ? ` <button class="link" data-refuse="${i}">اعتذر</button>` : '';
         return `<tr class="${r.sub ? '' : 'missing'}">
           <td class="per" data-l="الحصة">${slotLabel(r.slot, r.c)}</td>
           <td data-l="الصف">${codeHTML(r.c)}</td>
-          <td data-l="المادة">${esc(r.t)}</td>
-          <td data-l="المؤمِّن"><select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="طوارئ">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
+          <td data-l="المادة">${esc(r.t)}${BREAKS.has(r.slot) ? ' <span class="badge duty">مراقبة</span>' : ''}</td>
+          <td data-l="المؤمِّن">${picks}<select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="طوارئ">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
         </tr>`;
       }).join('');
     }).join('');
@@ -562,9 +581,12 @@
     $('#swapList').innerHTML = state.swaps.map((sw, si) => {
       const when = swWhen(sw);
       const rows = sw.items.map((it, ii) => {
-        const opts = swapOptions(sw, it, hist).map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}${o.covering ? ' (عنده تأمين اليوم)' : ''}</option>`).join('');
-        const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="">— للتأمين —</option>${opts}</select>`;
-        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${slotLabel(it.s, it.c)}</td><td data-l="المعلم">${it.b ? '<span class="role-tag">البديل</span>' : ''}${sel}</td></tr>`;
+        const all = swapOptions(sw, it, hist);
+        const top = all.filter(o => !o.covering).slice(0, 4);
+        const picks = top.length ? `<div class="picks">${top.map((o, k) => `<button class="pick ${o.b === it.b && o.s2 === it.s2 ? 'on' : ''}" data-swpick="${si}|${ii}" data-v="${o.b}|${o.s2}"><span class="rk">${RANK[k]}</span>${esc(nm(o.b).replace(/^أ\.\s*/, ''))} <small>(${SLOT_NAME[o.s2]})</small>${k === 0 ? '<i>الأنسب</i>' : ''}</button>`).join('')}</div>` : '';
+        const opts = all.map(o => `<option value="${o.b}|${o.s2}" ${o.b === it.b && o.s2 === it.s2 ? 'selected' : ''}>${esc(nm(o.b))}${o.covering ? ' (عنده تأمين اليوم)' : ''}</option>`).join('');
+        const sel = `<select data-sw="${si}" data-it="${ii}" aria-label="من يدخل الحصة ${SLOT_NAME[it.s]}"><option value="" ${!it.b && !it.none ? 'selected' : ''}>${db.settings.swapMode === 'manual' && !it.none ? '— اختر البديل —' : '— للتأمين —'}</option>${db.settings.swapMode === 'manual' ? `<option value="__cover" ${it.none ? 'selected' : ''}>— بدون تبديل (يدخل التأمين) —</option>` : ''}${opts}</select>`;
+        const first = `<tr class="${it.b ? 'pair-a' : 'missing'}"><td rowspan="${it.b ? 2 : 1}" data-l="الصف">${codeHTML(it.c)}</td><td class="per" data-l="الحصة">${slotLabel(it.s, it.c)}</td><td data-l="المعلم">${it.b ? '<span class="role-tag">البديل</span>' : ''}${picks}${sel}</td></tr>`;
         const second = it.b ? `<tr class="pair-b"><td class="per" data-l="الحصة">${slotLabel(it.s2, it.c)}</td><td data-l="المعلم"><span class="role-tag">المستأذن</span><b>${esc(nm(sw.a))}</b></td></tr>` : '';
         return first + second;
       }).join('');
@@ -817,6 +839,18 @@
     commit(); renderResults();
     toast(isE(r.sub) ? `ما فيه معلم متاح — انتقلت للطوارئ: ${nm(r.sub)}` : r.sub ? `تم التحويل إلى ${nm(r.sub)}` : 'ما فيه أحد متاح لهالحصة');
   });
+  $('#resTable').addEventListener('click', e => {
+    const b = e.target.closest('[data-pick]'); if (!b) return;
+    const r = state.rows[+b.dataset.pick];
+    r.sub = r.sub === b.dataset.t && db.settings.coverMode === 'manual' ? '' : b.dataset.t; r.m = !!r.sub;
+    commit(); renderResults();
+  });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]'); if (!b) return;
+    db.settings[b.dataset.key] = b.dataset.mode; persist(); cloudConfig();
+    recompute(); renderAll(); renderModes();
+    toast(b.dataset.mode === 'manual' ? 'صار الاختيار يدوي — اختر من المرتّبين' : 'صار التوزيع تلقائي');
+  });
   $('#resTable').addEventListener('change', e => {
     const sel = e.target.closest('select[data-row]'); if (!sel) return;
     const r = state.rows[+sel.dataset.row];
@@ -845,13 +879,22 @@
   $('#swapList').addEventListener('change', e => {
     const sel = e.target.closest('select[data-sw]'); if (!sel) return;
     const it = state.swaps[+sel.dataset.sw].items[+sel.dataset.it];
-    if (sel.value) { const [b, s2] = sel.value.split('|'); Object.assign(it, { b, s2, m: true, none: false }); }
+    if (sel.value === '__cover') Object.assign(it, { b: '', s2: '', t2: '', m: true, none: true });
+    else if (sel.value) { const [b, s2] = sel.value.split('|'); Object.assign(it, { b, s2, m: true, none: false }); }
+    else if (db.settings.swapMode === 'manual') Object.assign(it, { b: '', s2: '', t2: '', m: false, none: false });
     else Object.assign(it, { b: '', s2: '', t2: '', m: true, none: true });
     afterChange();
   });
   $('#btnSwapPdf').addEventListener('click', e => pdfDay(date, state, e.currentTarget, 'swap'));
   $('#btnSwapPrint').addEventListener('click', () => printDay(date, state, 'swap'));
   $('#swapList').addEventListener('click', async e => {
+    const p = e.target.closest('[data-swpick]');
+    if (p) {
+      const [si, ii] = p.dataset.swpick.split('|').map(Number), it = state.swaps[si].items[ii];
+      const [b, s2] = p.dataset.v.split('|');
+      Object.assign(it, { b, s2, m: true, none: false });
+      afterChange(); return;
+    }
     const d = e.target.closest('[data-swdel]'); if (!d) return;
     const sw = state.swaps[+d.dataset.swdel];
     if (!(await ask(`إلغاء طلب ${nm(sw.a)}؟`, 'إلغاء الطلب'))) return;
@@ -949,8 +992,8 @@
         if (!next && it.b && refused.includes(it.b)) { Object.assign(it, { b: '', s2: '', t2: '', m: false, none: true }); changed = true; }
       } else {
         const r = state.rows.find(x => x.absent === key.absent && x.slot === key.slot); if (!r) return false;
-        const merged = [...new Set([...(r.refused || []), ...refused])];
-        if (merged.length !== (r.refused || []).length) { r.refused = merged; changed = true; }
+        const merged = [...new Set(refused)];
+        if (JSON.stringify(merged) !== JSON.stringify(r.refused || [])) { r.refused = merged; changed = true; }
         if (next && r.sub !== next) { r.sub = next; r.m = true; changed = true; }
         if (!next && r.sub && merged.includes(r.sub)) { r.sub = ''; r.m = false; changed = true; }
       }
