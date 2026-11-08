@@ -1,0 +1,24 @@
+const { chromium, devices } = require('playwright');
+(async () => {
+  const b = await chromium.launch();
+  const ctx = await b.newContext({ ...devices['iPhone 13'] });
+  await ctx.route('**/firebase-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.FIREBASE_CONFIG=null;' }));
+  await ctx.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '#demoNote{display:none!important}'; document.head.appendChild(st); }); });
+  const logs = []; const A = await ctx.newPage(); A.on('pageerror', e => logs.push('A ' + e.message));
+  await A.goto('http://localhost:8766/index.html'); await A.waitForTimeout(900);
+  await A.evaluate(() => document.querySelectorAll('body > div[style*="position:fixed"]').forEach(x => x.remove()));
+  await A.evaluate(() => document.querySelector('.tab[data-tab="app"]').click()); await A.evaluate(() => document.querySelector('#btnLinks').click()); await A.waitForTimeout(700);
+  const code = await A.evaluate(() => window.APT.settings.codes[window.APT.T.find(t => /فلاح/.test(t.name)).id]);
+  const P = await ctx.newPage(); P.on('pageerror', e => logs.push('P ' + e.message));
+  await P.goto('http://localhost:8766/app/?k=' + code); await P.waitForTimeout(1300);
+  await P.screenshot({ path: __dirname + '/guide/t_home_new.png' });
+  await P.tap('#btnReq'); await P.waitForTimeout(500);
+  const sel = async () => P.evaluate(() => [...document.querySelectorAll('#rqPer .on')].map(x => x.dataset.p).join(','));
+  await P.fill('#rqDate', '2026-11-09'); await P.dispatchEvent('#rqDate', 'change'); await P.dispatchEvent('#rqDate', 'input'); await P.waitForTimeout(400);
+  console.log('chips:', await P.evaluate(() => [...document.querySelectorAll('#rqPer [data-p]')].map(x => x.dataset.p).join(',')));
+  await P.tap('#rqPer [data-p="1"]'); await P.waitForTimeout(400); await P.tap('#rqPer [data-p="5"]'); await P.waitForTimeout(400);
+  await P.fill('#rqWhy', 'موعد طبي رسمي');
+  console.log('summary:', await P.textContent('#rqSel'));
+  await P.screenshot({ path: __dirname + '/guide/t_req_form.png' });
+  console.log(logs.join('\n') || 'no errors'); await b.close();
+})();
