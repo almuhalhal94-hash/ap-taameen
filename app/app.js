@@ -70,9 +70,9 @@
   const SUP = ROLE === 'sup' || ROLE === 'both', TEACH = ROLE !== 'sup';
   $('#top').hidden = false; $('#bar').hidden = false;
   $('#myName').textContent = me.name;
-  $('#roleTitle').textContent = ROLE === 'sup' ? 'متابعة المشرف' : 'التأمين والتبديل';
+  $('#roleTitle').textContent = ROLE === 'sup' ? 'متابعة المشرف' : ROLE === 'both' ? 'معلم ومشرف' : 'التأمين والتبديل';
   $('#tabSup').hidden = !SUP; $('#tabTasks').hidden = !TEACH; $('#tabExp').hidden = !TEACH;
-  $('#meBtn').addEventListener('click', () => sheet(`<h3>${esc(me.name)}</h3><p class="muted">${ROLE === 'sup' ? 'دخلت برمز المشرف' : 'دخلت برمز المعلم'}</p>
+  $('#meBtn').addEventListener('click', () => sheet(`<h3>${esc(me.name)}</h3><p class="muted">${ROLE === 'sup' ? 'دخلت برمز المشرف' : ROLE === 'both' ? 'دخلت كمعلم ومشرف' : 'دخلت برمز المعلم'}</p>
     <div class="sheet-btns"><button class="b-ghost" data-x="out">تسجيل الخروج</button><button class="b-ok" data-x="close">رجوع</button></div>`, { out: () => { store.del('apt-key'); location.reload(); } }));
 
   // ---------- التنقل ----------

@@ -360,13 +360,13 @@
   const newCode = used => { let c; do { c = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); } while (used.has(c)); used.add(c); return c; };
   const msgFor = t => {
     const c = codes()[t.id], sc = supCodes()[t.id];
-    return `السلام عليكم ${t.name}\nتطبيق التأمين والتبديل — مدرسة ابن رشد:\n${APP_URL}\nرمز دخولك: ${c}${sc ? `\nرمز المشرف (متابعة صفوفك): ${sc}` : ''}\nالرمز خاص بك، فضلًا لا تشاركه.`;
+    return `السلام عليكم ${t.name}\nتطبيق التأمين والتبديل — مدرسة ابن رشد:\n${APP_URL}\nرمز دخولك: ${c}${isSup(t.id) ? '\n(نفس الرمز يفتح لك تكليفاتك ومتابعة صفوف إشرافك)' : ''}\nالرمز خاص بك، فضلًا لا تشاركه.`;
   };
   function renderLinks() {
     const C = codes(), SC = supCodes();
     if (!Object.keys(C).length) { $('#linkList').innerHTML = '<p class="muted">اضغط «تجهيز الرموز».</p>'; return; }
     $('#linkList').innerHTML = `<p class="hint">رابط التطبيق للجميع: <b dir="ltr">${esc(APP_URL)}</b> — وكل واحد يدخل برمزه.</p>` + [...A.T].sort((a, b) => a.name.localeCompare(b.name, 'ar')).filter(t => C[t.id]).map(t =>
-      `<div class="lk"><b>${esc(t.name)}</b><span class="codes"><span class="code-pill" title="رمز المعلم">${C[t.id]}</span>${SC[t.id] ? `<span class="code-pill sup" title="رمز المشرف">مشرف ${SC[t.id]}</span>` : ''}</span><span class="btn-row"><button class="btn sm" data-copy="${t.id}">نسخ الرسالة</button></span></div>`).join('');
+      `<div class="lk"><b>${esc(t.name)}</b><span class="codes"><span class="code-pill" title="رمز الدخول">${C[t.id]}</span>${isSup(t.id) ? '<span class="code-pill sup" title="نفس الرمز للمعلم والمشرف">معلم + مشرف</span>' : ''}</span><span class="btn-row"><button class="btn sm" data-copy="${t.id}">نسخ الرسالة</button></span></div>`).join('');
   }
   async function makeCodes(again) {
     const C = codes(), SC = supCodes();
@@ -374,15 +374,18 @@
     const used = new Set([...Object.values(C), ...Object.values(SC)]);
     const old = again ? [...Object.values(C), ...Object.values(SC)] : [];
     if (again) { A.settings.codes = {}; A.settings.supCodes = {}; used.clear(); }
-    const C2 = codes(), SC2 = supCodes();
-    A.T.forEach(t => { if (!C2[t.id]) C2[t.id] = newCode(used); if (isSup(t.id) && !SC2[t.id]) SC2[t.id] = newCode(used); if (!isSup(t.id)) delete SC2[t.id]; });
+    const C2 = codes();
+    // المشرف برمز واحد مع المعلم: نلغي رموز المشرف المنفصلة القديمة
+    const oldSup = Object.values(supCodes()); A.settings.supCodes = {};
+    A.T.forEach(t => { if (!C2[t.id]) C2[t.id] = newCode(used); });
     A.saveSettings();
     $('#btnLinks').disabled = true;
     try {
       for (const t of A.T) {
-        await S.put('people/' + C2[t.id], { tid: t.id, name: t.name, role: 'teacher', sup: false });
-        if (SC2[t.id]) await S.put('people/' + SC2[t.id], { tid: t.id, name: t.name, role: 'sup', sup: true, supLabel: A.supLabel(t.id) });
+        const sp = isSup(t.id);
+        await S.put('people/' + C2[t.id], { tid: t.id, name: t.name, role: sp ? 'both' : 'teacher', sup: sp, supLabel: sp ? A.supLabel(t.id) : '' });
       }
+      for (const c of oldSup) await S.put('people/' + c, { revoked: true });
       for (const c of old) await S.put('people/' + c, { revoked: true });
       A.toast('الرموز جاهزة');
     } catch (e) { A.toast('تعذّر الحفظ — تأكد من الاتصال'); }
@@ -395,7 +398,7 @@
   $('#linkList').addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copy(msgFor(A.byId[b.dataset.copy])); });
   $('#btnCopyAll').addEventListener('click', () => {
     const C = codes(); if (!Object.keys(C).length) return A.toast('جهّز الرموز أول');
-    copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${supCodes()[t.id] ? ` — مشرف: ${supCodes()[t.id]}` : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
+    copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${isSup(t.id) ? ' (معلم + مشرف)' : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
   });
 
   // ---------------- الشارة ----------------
