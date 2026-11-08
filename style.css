@@ -356,3 +356,5 @@ a.btn{text-decoration:none}
 .rnote.adm{color:var(--red2);font-weight:600}
 .pick.adm{border-style:dashed;border-color:var(--gold);color:var(--warn)}
 .pick.adm.on{background:linear-gradient(135deg,#b8862b,#8a6420);color:#fff;border-style:solid}
+.btn.send{background:linear-gradient(135deg,#0f9d6b,#047857);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(4,120,87,.3)}
+.btn.send.done{background:var(--surface);color:var(--ok);border-color:var(--ok);box-shadow:none}

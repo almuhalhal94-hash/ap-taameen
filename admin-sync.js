@@ -83,12 +83,13 @@
       for (const w of want) await S.tx('assign/' + w.id, cur => merged(cur, w));
       for (const d of docs) if (d.date === iso && !ids.has(d.id) && d.status !== 'cancelled') await S.set('assign/' + d.id, { status: 'cancelled', updatedAt: now() });
       if (!sentDays()[iso]) { sentDays()[iso] = true; A.saveSettings(); }
-      if (manual) A.toast(`انرسل لـ ${new Set(want.map(w => w.to).filter(Boolean)).size} معلم`);
+      if (manual) A.toast(`✓ تم الإرسال لـ ${new Set(want.map(w => w.to).filter(Boolean)).size} معلم — يطلع لهم في التطبيق الحين`);
     } catch (e) { console.warn(e); A.toast('تعذّر الإرسال — تأكد من الاتصال'); }
     finally { busy = false; if (again) { again = false; publish(false); } }
     renderSend();
   }
   $('#btnSend').addEventListener('click', () => publish(true));
+  document.querySelectorAll('[data-send-now]').forEach(b => b.addEventListener('click', () => publish(true)));
 
   // بعد أول إرسال لليوم: أي تعديل على التأمين يوصل تلقائي
   let tmr;
@@ -135,6 +136,7 @@
     const iso = A.date, n = desired().length, sent = !!sentDays()[iso];
     $('#respDay').textContent = `${A.weekdayName(iso)} ${A.fmtG(iso)}`;
     $('#btnSend').textContent = sent ? 'إعادة الإرسال' : 'إرسال تأمين اليوم للمعلمين';
+    document.querySelectorAll('[data-send-now]').forEach(b => { b.textContent = sent ? '✓ انرسل — إعادة الإرسال' : '📲 إرسال للمعلمين'; b.classList.toggle('done', sent); });
     $('#sendNote').textContent = !n ? 'ما فيه تأمين أو تبديل لهذا اليوم. اختر الغائبين من «تأمين اليوم».'
       : sent ? `انرسل. أي تعديل على التأمين يوصل للمعلمين تلقائيًا، ولو اعتذر أحد يتحوّل للبديل اللي بعده.`
         : `${n} مهمة جاهزة للإرسال.`;
