@@ -363,24 +363,31 @@
     const absT = byId[row.absent];
     const taken = new Set(rows.filter(r => r !== row && r.sub && overlap(ivOf(r.slot, r.c), iv)).map(r => r.sub));
     const isB = BREAKS.has(s);
-    const tc = {}, extra = {};
-    rows.forEach(r => { if (r !== row && r.sub) { if (BREAKS.has(r.slot) === isB) tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
-    const list = T.filter(t => !NO_COVER.has(t.id) && presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOutIv(t.id, iv) && !ctx.busyIv(t.id, iv) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c, s));
+    const tc = {}, extra = {}, all = {};
+    rows.forEach(r => { if (r !== row && r.sub) { all[r.sub] = (all[r.sub] || 0) + 1; if (BREAKS.has(r.slot) === isB) tc[r.sub] = (tc[r.sub] || 0) + 1; (extra[r.sub] = extra[r.sub] || []).push(r.slot); } });
+    // سقف قاطع: لا يُعطى المعلم أكثر من تأمينين في اليوم (التأمين + المراقبة معًا)
+    const CAP = Math.max(2, db.settings.maxPerDay || 1);
+    const list = T.filter(t => !NO_COVER.has(t.id) && (all[t.id] || 0) < CAP && presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOutIv(t.id, iv) && !ctx.busyIv(t.id, iv) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c, s));
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
       const run = runAfter(ctx, t.id, s, extra[t.id] || []);
+      const nAll = all[t.id] || 0;
       if (isB) {
-        // بديل المراقبة: من معلمي المراقبة أولًا، والأخف نصابًا (اليوم ثم الأسبوع)، وواحدة باليوم
-        const over = n >= 1, duty = DUTY_T.has(t.id), consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-        return { t, h, n, same, load, run, over, duty, swp: inSwap.has(t.id), key: [over ? 1 : 0, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
+        // بديل المراقبة: ما يكون عنده حصة قبل الفسحة أو بعدها مباشرة، ثم معلمو المراقبة، والأخف نصابًا، وواحدة باليوم
+        const i = SLOT_ORDER.indexOf(s), nb = [SLOT_ORDER[i - 1], SLOT_ORDER[i + 1]].filter(Boolean);
+        const ex = extra[t.id] || [];
+        const adjS = nb.filter(x => ex.includes(x) || (ctx.cell(t.id, x) && !NON_TEACHING.has(ctx.cell(t.id, x).t)));
+        const adj = adjS.length;
+        const over = n >= 1 || nAll >= db.settings.maxPerDay, duty = DUTY_T.has(t.id), consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
+        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, swp: inSwap.has(t.id), key: [over ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
       }
-      const over = n >= db.settings.maxPerDay;
+      const over = n >= db.settings.maxPerDay || nAll >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-      return { t, h, n, same, load, run, over, swp: inSwap.has(t.id), key: [over ? 1 : 0, n, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
+      return { t, h, n, nAll, same, load, run, over, swp: inSwap.has(t.id), key: [over ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
     }).sort((a, b) => sortKey(a.key, b.key) || a.t.name.localeCompare(b.t.name, 'ar'));
   }
 
@@ -391,7 +398,9 @@
   }
   // يختار للحصة الأنسب، وإذا ما فيه أحد يروح للطوارئ
   function assignOne(r, rows, hist, ctx) {
-    const best = candidates(r, rows, hist, ctx).find(c => !c.over);
+    // الأصل تأمين واحد باليوم؛ وإذا ما فيه أحد، للضرورة القصوى يُعطى تأمين ثانٍ مع تنبيه للإداري، وبعدها الإدارة
+    const cs = candidates(r, rows, hist, ctx);
+    const best = cs.find(c => !c.over) || cs[0];
     r.sub = best ? best.t.id : (emergencyFree(r, rows)[0] || '');
   }
 
@@ -411,7 +420,7 @@
     const pending = rows.filter(r => !r.m);
     pending.forEach(r => { r.sub = ''; });
     while (pending.length && db.settings.coverMode !== 'manual') {
-      pending.forEach(r => { r._n = candidates(r, rows, hist, ctx).filter(c => !c.over).length; });
+      pending.forEach(r => { const cs = candidates(r, rows, hist, ctx); r._n = cs.filter(c => !c.over).length + (cs.length ? .5 : 0); });
       pending.sort((a, b) => a._n - b._n || slotIdx(a.slot) - slotIdx(b.slot));
       const r = pending.shift();
       assignOne(r, rows, hist, ctx);
@@ -509,13 +518,15 @@
       return head + g.rows.map(({ r, i }) => {
         const cands = candidates(r, rows, hist, ctx);
         const opts = cands.map(c => {
-          const note = [c.same ? 'نفس القسم' : c.t.dept, `أمّن ${arNum(c.h)}`, `${arNum(c.load)} حصص اليوم`, c.over ? '⚠ تجاوز الحد' : '', c.swp ? 'عنده تبديل اليوم' : '', c.run >= 4 ? `⚠ ${arNum(c.run)} متتالية` : ''].filter(Boolean).join(' · ');
+          const note = [c.same ? 'نفس القسم' : c.t.dept, `أمّن ${arNum(c.h)}`, `${arNum(c.load)} حصص اليوم`, c.over ? `⚠ ${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} (للضرورة)` : '', c.adj ? `⚠ عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', c.swp ? 'عنده تبديل اليوم' : '', c.run >= 4 ? `⚠ ${arNum(c.run)} متتالية` : ''].filter(Boolean).join(' · ');
           return `<option value="${c.t.id}" ${c.t.id === r.sub ? 'selected' : ''}>${esc(c.t.name)} — ${esc(note)}</option>`;
         }).join('');
         const emg = emergencyFree(r, rows).map(id => `<option value="${esc(id)}" ${id === r.sub ? 'selected' : ''}>${esc(nm(id))}</option>`).join('');
         const cur = cands.find(c => c.t.id === r.sub);
         const badge = !r.sub ? '<span class="badge none">بدون مؤمِّن</span>' : isE(r.sub) ? '<span class="badge emg">طوارئ</span>' : cur && cur.same ? '<span class="badge dept">من القسم</span>' : '<span class="badge other">من قسم آخر</span>';
         const top = cands.filter(c => !c.over).slice(0, 4);
+        const second = cur && cur.over ? `<div class="warn2">⚠ للضرورة: ${esc(cur.t.name)} سيحضر <b>تأمينين في هذا اليوم</b>، لأنه ما فيه معلم متاح بتأمين واحد.</div>` : '';
+        const adjW = cur && cur.adj ? `<div class="warn2">⚠ ${esc(cur.t.name)} عنده حصة ${cur.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة مباشرة (ما فيه أخف منه).</div>` : '';
         const emgFree = emergencyFree(r, rows);
         const emgBtn = emgFree.length || isE(r.sub) ? `<button class="pick adm ${isE(r.sub) ? 'on' : ''}" data-pick="${i}" data-t="${esc(isE(r.sub) ? r.sub : emgFree[0])}" title="${esc(emgFree.map(nm).join('، '))}">🛡 الإدارة تؤمّن${isE(r.sub) ? ': ' + esc(nm(r.sub)) : ''}</button>` : '';
         const picks = top.length || emgBtn ? `<div class="picks">${top.map((c, k) => `<button class="pick ${c.t.id === r.sub ? 'on' : ''}" data-pick="${i}" data-t="${c.t.id}" title="${esc(c.t.dept)}"><span class="rk">${RANK[k]}</span>${esc(c.t.name.replace(/^أ\.\s*/, ''))}${k === 0 ? '<i>الأنسب</i>' : ''}</button>`).join('')}${emgBtn}</div>` : '';
@@ -525,7 +536,7 @@
           <td class="per" data-l="الحصة">${slotLabel(r.slot, r.c)}</td>
           <td data-l="الصف">${codeHTML(r.c)}</td>
           <td data-l="المادة">${esc(r.t)}${BREAKS.has(r.slot) ? ' <span class="badge duty">مراقبة</span>' : ''}</td>
-          <td data-l="المؤمِّن">${picks}<select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="الإدارة تؤمّن">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span></td>
+          <td data-l="المؤمِّن">${picks}<select data-row="${i}" aria-label="المعلم المؤمِّن"><option value="">— بدون تأمين —</option><optgroup label="المعلمون">${opts}</optgroup>${emg ? `<optgroup label="الإدارة تؤمّن">${emg}</optgroup>` : ''}</select><span class="why">${badge}${r.m ? ' <span class="badge dept">يدوي</span>' : ''}${refuseBtn}${refusedTxt}</span>${second}${adjW}</td>
         </tr>`;
       }).join('');
     }).join('');
@@ -982,7 +993,7 @@
     get settings() { return db.settings; },
     saveSettings() { persist(); cloudConfig(); },
     // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
-    ranked(row) { return candidates(row, state.rows, historyCounts(date), context()).filter(c => !c.over).map(c => c.t.id); },
+    ranked(row) { const cs = candidates(row, state.rows, historyCounts(date), context()); return [...cs.filter(c => !c.over), ...cs.filter(c => c.over)].map(c => c.t.id); },
     swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },
     // يطبّق رد معلم: اعتذار (يضاف للمعتذرين) والبديل الجديد اللي اختاره التطبيق
     applyRefusal(iso, key, refused, next) {

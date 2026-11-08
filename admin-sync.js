@@ -153,7 +153,10 @@
       .filter(d => filt === 'all' || (filt === 'refused' ? (d.refused || []).length : d.status === filt))
       .sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot) || a.absentName.localeCompare(b.absentName, 'ar'));
     if (!list.length) { $('#respList').innerHTML = `<p class="muted">${docs.length ? 'لا يوجد في هذا التصنيف.' : 'ما انرسل شي لهذا اليوم بعد.'}</p>`; return; }
-    $('#respList').innerHTML = list.map(d => {
+    const all = docs.filter(d => d.date === A.date && d.status !== 'cancelled');
+    const cnt = {}; all.forEach(d => { const k = viewState(d).k; cnt[k] = (cnt[k] || 0) + 1; });
+    const legend = VS_ORDER.filter(k => cnt[k]).map(k => `<span class="vchip v-${k}">${VS[k].icon} ${VS[k].short} <b>${cnt[k]}</b></span>`).join('');
+    $('#respList').innerHTML = (legend ? `<div class="vlegend">${legend}</div>` : '') + list.map(d => {
       const ref = (d.refused || []).map(id => `<span class="who bad">${esc((d.names || {})[id] || tName(id))} <button class="link" data-exp="${d.id}" data-t="${id}" data-r="${d.kind === 'swap' ? 'swap' : 'refuse'}">استيضاح</button></span>`).join('');
       const ACT = { rejected: 'اعتذر', returned: 'تراجع عن اعتذاره وسيحضر', undo: 'تراجع خلال ثوانٍ', withdrew: 'اعتذر بعد القبول', askback: 'يطلب الرجوع للتكليف', admin: '', kept: 'أبقت الإدارة الزميل' };
       const notes = (d.log || []).filter(l => l.act in ACT && l.act !== 'accepted' && (l.note || l.act !== 'rejected')).map(l => `<div class="rnote ${l.act === 'admin' || l.act === 'kept' ? 'adm' : ''}">${esc(l.name)}${ACT[l.act] ? ': ' + ACT[l.act] : ''}${l.note ? ` — «${esc(l.note)}»` : ''} <small>${fmtTime(l.at)}</small></div>`).join('');
@@ -168,7 +171,9 @@
       const what = d.kind === 'swap'
         ? `يأخذ حصة ${esc(d.absentName)} <b>${esc(d.slotName)}</b> ${code(d.c)}، و${esc(d.absentName)} يأخذ حصته <b>${esc(d.s2Name || '')}</b>`
         : `${d.out ? 'مستأذن' : 'غائب'}: ${esc(d.absentName)} ${d.label && d.label !== 'حصة' ? '— ' + esc(d.label) : ''}${d.c ? ` · ${code(d.c)}` : ''}`;
-      return `<div class="resp ${d.status}">
+      const vs = viewState(d);
+      return `<div class="resp ${d.status} v-${vs.k}">
+        <div class="vstate">${vs.icon} ${vs.txt}</div>
         <div class="rt"><span class="kind k-${d.kind}">${KIND[d.kind]}</span><b>${esc(d.slotName)}</b> <small dir="ltr">${esc(d.time)}</small></div>
         <div class="rw">${what}</div>
         <div class="rto">المكلّف: <b>${who}</b> ${st} ${d.auto ? '<span class="st auto">بديل تلقائي</span>' : ''}
@@ -176,6 +181,36 @@
         ${ref ? `<div class="rref">اعتذر: ${ref}</div>` : ''}${notes}${req}${ctl}
       </div>`;
     }).join('');
+  }
+  // حالة البطاقة بلون واضح للإداري: أخضر استلم، برتقالي اعتذر وانتقل، أحمر يحتاج قرار، ذهبي بانتظار، أزرق الإدارة
+  const VS = {
+    ok: { icon: '✓', short: 'تم الاستلام' },
+    moved: { icon: '↺', short: 'اعتذار وانتقل لزميل' },
+    act: { icon: '⚠', short: 'يحتاج قرارك' },
+    wait: { icon: '⏳', short: 'بانتظار الاستلام' },
+    emg: { icon: '🛡', short: 'الإدارة تؤمّن' },
+    none: { icon: '✕', short: 'بدون مؤمّن' }
+  };
+  const VS_ORDER = ['act', 'none', 'moved', 'wait', 'ok', 'emg'];
+  function viewState(d) {
+    const nm = id => (d.names || {})[id] || tName(id);
+    const ref = d.refused || [];
+    const last = [...(d.log || [])].reverse().find(l => l.tid !== 'admin') || {};
+    const lastRef = ref.length ? nm(ref[ref.length - 1]) : '';
+    let k, txt;
+    if (d.returnReq) { k = 'act'; txt = `${esc(d.returnReq.name)} يطلب الرجوع للتكليف — قرر الآن`; }
+    else if (!d.to && !d.emg) { k = 'none'; txt = ref.length ? `اعتذر ${esc(lastRef)} وما فيه بديل — أسندها لأحد` : 'بدون مؤمّن — أسندها لأحد'; }
+    else if (d.emg && !d.to) { k = 'emg'; txt = `تؤمّنها الإدارة: ${esc(d.emg)}`; }
+    else if (d.status === 'accepted') {
+      k = ref.length ? 'moved' : 'ok';
+      txt = ref.length ? `اعتذر ${esc(lastRef)} ← واستلمها ${esc(d.toName)} ✓` : `استلم ${esc(d.toName)} التكليف`;
+      if (!ref.length) k = 'ok';
+    }
+    else if (last.act === 'withdrew') { k = 'act'; txt = `${esc(last.name)} اعتذر بعد ما استلم — انتقل إلى ${esc(d.toName)} (بانتظار استلامه)`; }
+    else if (ref.length) { k = 'moved'; txt = `اعتذر ${esc(lastRef)} ← انتقل إلى ${esc(d.toName)} (بانتظار استلامه)`; }
+    else if (last.act === 'returned' || last.act === 'undo') { k = 'wait'; txt = `${esc(last.name)} تراجع عن اعتذاره — بانتظار استلامه`; }
+    else { k = 'wait'; txt = `بانتظار استلام ${esc(d.toName)}`; }
+    return { k, txt, icon: VS[k].icon };
   }
   // ---------------- تحكم الإدارة الكامل ----------------
   const firstOf = d => d.first || ((d.log || []).find(l => l.tid && l.tid !== 'admin') || {}).tid || d.to;
