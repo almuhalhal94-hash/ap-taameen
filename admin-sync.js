@@ -159,7 +159,11 @@
     $('#respList').innerHTML = (legend ? `<div class="vlegend">${legend}</div>` : '') + list.map(d => {
       const ref = (d.refused || []).map(id => `<span class="who bad">${esc((d.names || {})[id] || tName(id))} <button class="link" data-exp="${d.id}" data-t="${id}" data-r="${d.kind === 'swap' ? 'swap' : 'refuse'}">استيضاح</button></span>`).join('');
       const ACT = { rejected: 'اعتذر', returned: 'تراجع عن اعتذاره وسيحضر', undo: 'تراجع خلال ثوانٍ', withdrew: 'اعتذر بعد القبول', askback: 'يطلب الرجوع للتكليف', admin: '', kept: 'أبقت الإدارة الزميل' };
-      const notes = (d.log || []).filter(l => l.act in ACT && l.act !== 'accepted' && (l.note || l.act !== 'rejected')).map(l => `<div class="rnote ${l.act === 'admin' || l.act === 'kept' ? 'adm' : ''}">${esc(l.name)}${ACT[l.act] ? ': ' + ACT[l.act] : ''}${l.note ? ` — «${esc(l.note)}»` : ''} <small>${fmtTime(l.at)}</small></div>`).join('');
+      // السجل الكامل مطوي، والظاهر بس الحالة الأخيرة (الشريط الملون) عشان ما تتكدس «أسندت…» فوق بعض
+      const HIST = { ...ACT, accepted: 'استلم التكليف ✓', admin: '' };
+      const hl = (d.log || []).filter(l => l.act in HIST);
+      const lastAdm = [...hl].reverse().find(l => l.act === 'admin');
+      const notes = hl.length ? `<details class="rhist"><summary>سجل التكليف (${hl.length}) — آخر حركة ${fmtTime(hl[hl.length - 1].at)}</summary>${hl.map((l, k) => `<div class="rnote ${l.act === 'admin' || l.act === 'kept' ? 'adm' : ''} ${l === lastAdm ? 'last' : l.act === 'admin' ? 'old' : ''}"><span class="n">${k + 1}</span>${esc(l.name)}${HIST[l.act] ? ': ' + HIST[l.act] : ''}${l.note ? ` — ${l.act === 'admin' ? esc(l.note) : '«' + esc(l.note) + '»'}` : ''}${l.act === 'admin' && l !== lastAdm ? ' <small class="muted">(أُلغي بإسناد لاحق)</small>' : ''} <small>${fmtTime(l.at)}</small></div>`).join('')}</details>` : '';
       const first = firstOf(d);
       const req = d.returnReq ? `<div class="rreq">⭐ <b>${esc(d.returnReq.name)}</b> (المكلّف الأول) تراجع عن اعتذاره ويطلب الرجوع، والزميل ${esc(d.toName)} استلم.
           <span class="btn-row"><button class="btn sm primary" data-ctl="giveback" data-id="${d.id}">اعتماد رجوعه</button><button class="btn sm" data-ctl="keep" data-id="${d.id}">إبقاء الزميل</button></span></div>` : '';
@@ -192,6 +196,8 @@
     none: { icon: '✕', short: 'بدون مؤمّن' }
   };
   const VS_ORDER = ['act', 'none', 'moved', 'wait', 'ok', 'emg'];
+  // آخر حركة في السجل كانت إسناد من الإدارة (أو قبول بعده)
+  const lastAdmin = d => { const l = (d.log || []).filter(x => x.act !== 'accepted'); return l.length && l[l.length - 1].act === 'admin'; };
   function viewState(d) {
     const nm = id => (d.names || {})[id] || tName(id);
     const ref = d.refused || [];
@@ -203,12 +209,13 @@
     else if (d.emg && !d.to) { k = 'emg'; txt = `تؤمّنها الإدارة: ${esc(d.emg)}`; }
     else if (d.status === 'accepted') {
       k = ref.length ? 'moved' : 'ok';
-      txt = ref.length ? `اعتذر ${esc(lastRef)} ← واستلمها ${esc(d.toName)} ✓` : `استلم ${esc(d.toName)} التكليف`;
+      txt = ref.length ? `اعتذر ${esc(lastRef)} ← واستلمها ${esc(d.toName)} ✓` : `استلم ${esc(d.toName)} التكليف${lastAdmin(d) ? ' (بإسناد الإدارة)' : ''}`;
       if (!ref.length) k = 'ok';
     }
     else if (last.act === 'withdrew') { k = 'act'; txt = `${esc(last.name)} اعتذر بعد ما استلم — انتقل إلى ${esc(d.toName)} (بانتظار استلامه)`; }
     else if (ref.length) { k = 'moved'; txt = `اعتذر ${esc(lastRef)} ← انتقل إلى ${esc(d.toName)} (بانتظار استلامه)`; }
     else if (last.act === 'returned' || last.act === 'undo') { k = 'wait'; txt = `${esc(last.name)} تراجع عن اعتذاره — بانتظار استلامه`; }
+    else if (lastAdmin(d)) { k = 'wait'; txt = `أسندته الإدارة إلى ${esc(d.toName)} — بانتظار استلامه`; }
     else { k = 'wait'; txt = `بانتظار استلام ${esc(d.toName)}`; }
     return { k, txt, icon: VS[k].icon };
   }

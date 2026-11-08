@@ -388,3 +388,9 @@ a.btn{text-decoration:none}
 .resp.v-emg .vstate{background:#2563a8}.vchip.v-emg{color:#2563a8}
 @keyframes vpulse{50%{filter:brightness(1.18)}}
 .warn2{margin-top:6px;padding:6px 9px;border-radius:8px;background:rgba(232,115,12,.12);border:1px solid rgba(232,115,12,.5);color:#b45309;font-size:.82rem;font-weight:600}
+.rhist{margin-top:6px;font-size:.82rem}
+.rhist summary{cursor:pointer;color:var(--muted);font-weight:600}
+.rhist .rnote{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.rhist .n{min-width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.08);display:inline-grid;place-items:center;font-size:.7rem}
+.rhist .rnote.old{text-decoration:line-through;opacity:.55}
+.rhist .rnote.last{font-weight:700}
