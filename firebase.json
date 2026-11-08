@@ -1,8 +1,27 @@
 {
-  "firestore": { "rules": "firestore.rules" },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", "firestore.rules", "**/.*", "tools/**", "*.md"],
-    "headers": [{ "source": "**/*.@(js|html|json)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }]
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "**/.*",
+      "tools/**",
+      "*.md",
+      "demo.html"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|html|json)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
   }
 }
