@@ -4,7 +4,7 @@ require('fs').mkdirSync(out, { recursive: true });
 (async () => {
   const b = await chromium.launch(); const ctx = await b.newContext({ deviceScaleFactor: 2 });
   await ctx.route('**/firebase-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.FIREBASE_CONFIG=null;' }));
-  await ctx.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '#demoNote,.sync-note,#toast,.toast{display:none!important} .tabs,nav,header,.sticky{position:static!important}'; document.head.appendChild(st); }); });
+  await ctx.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '.sheet-bg,.modal{background:transparent!important} #demoNote,.sync-note,#toast,.toast{display:none!important} .tabs,nav,header,.sticky{position:static!important}'; document.head.appendChild(st); }); });
   const logs = []; const w = (p, t) => p.on('pageerror', e => logs.push(t + ' ERR ' + e.message));
   const A = await ctx.newPage(); await A.setViewportSize({ width: 1180, height: 900 }); w(A, 'admin');
   await A.goto('http://localhost:8766/index.html'); await A.waitForTimeout(900);

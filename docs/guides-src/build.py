@@ -40,11 +40,11 @@ b{color:#4d0610}
 .box.red b{color:#a3121f}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4mm}
-.shot{border-radius:4mm;overflow:hidden;border:1px solid #e5d3ae;box-shadow:0 2mm 5mm rgba(77,6,16,.12);background:#fff}
+.shot{border-radius:4mm;overflow:hidden;border:1px solid #e5d3ae;background:#fff}
 .shot img{display:block;width:100%}
 .cap{font-size:9pt;color:#5a4a40;text-align:center;margin-top:2mm;line-height:1.6}
 .cap b{display:block;font-size:10pt}
-.phoneimg{border-radius:6mm;overflow:hidden;border:2.2mm solid #1b0d0b;box-shadow:0 2mm 6mm rgba(0,0,0,.25);background:#1b0d0b}
+.phoneimg{border-radius:6mm;overflow:hidden;border:2.2mm solid #1b0d0b;background:#1b0d0b}
 .phoneimg img{display:block;width:100%}
 .tag{display:inline-block;padding:.5mm 3mm;border-radius:10mm;font-size:9pt;font-weight:700}
 table{width:100%;border-collapse:collapse;font-size:9.5pt}

@@ -3,7 +3,7 @@ const { chromium, devices } = require('playwright');
   const b = await chromium.launch();
   const ctx = await b.newContext({ ...devices['iPhone 13'] });
   await ctx.route('**/firebase-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.FIREBASE_CONFIG=null;' }));
-  await ctx.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '#demoNote{display:none!important}'; document.head.appendChild(st); }); });
+  await ctx.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '.sheet-bg,.modal{background:transparent!important} #demoNote{display:none!important}'; document.head.appendChild(st); }); });
   const logs = []; const A = await ctx.newPage(); A.on('pageerror', e => logs.push('A ' + e.message));
   await A.goto('http://localhost:8766/index.html'); await A.waitForTimeout(900);
   await A.evaluate(() => document.querySelectorAll('body > div[style*="position:fixed"]').forEach(x => x.remove()));

@@ -1,9 +1,9 @@
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch();
-  const ctx = await b.newContext({ deviceScaleFactor: 2, viewport: { width: 1000, height: 900 } });
+  const ctx = await b.newContext({ deviceScaleFactor: 2, viewport: { width: 1000, height: 1700 } });
   await ctx.route('**/firebase-config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.FIREBASE_CONFIG=null;' }));
-  await ctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '#demoNote,.toast,#toast{display:none!important}.tabs,.day-sum{position:static!important}'; document.head.appendChild(st); }); });
+  await ctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = '.sheet-bg,.modal{background:transparent!important} #demoNote,.toast,#toast{display:none!important}.tabs,.day-sum{position:static!important}'; document.head.appendChild(st); }); });
   const p = await ctx.newPage(); const logs = []; p.on('pageerror', e => logs.push(e.message));
   await p.goto('http://localhost:8766/index.html'); await p.waitForTimeout(900);
   await p.evaluate(() => document.querySelectorAll('body > div[style*="position:fixed"]').forEach(x => x.remove()));
