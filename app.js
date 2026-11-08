@@ -226,7 +226,7 @@
     const src = db.history[iso];
     state = src ? JSON.parse(JSON.stringify({ absent: src.absent || {}, rows: src.rows || [], swaps: src.swaps || [] })) : emptyDay();
     renderAll();
-    document.dispatchEvent(new CustomEvent('apt:day'));
+    document.dispatchEvent(new CustomEvent('apt:day', { detail: 'load' }));
   }
   // الحفظ تلقائي مع كل تغيير
   function commit() {

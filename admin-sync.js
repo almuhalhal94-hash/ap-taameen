@@ -93,10 +93,11 @@
 
   // بعد أول إرسال لليوم: أي تعديل على التأمين يوصل تلقائي
   let tmr;
-  document.addEventListener('apt:day', () => {
+  document.addEventListener('apt:day', e => {
     watchDay();
     renderSend();
-    if (sentDays()[A.date]) { clearTimeout(tmr); tmr = setTimeout(() => publish(false), 600); }
+    // فتح الصفحة أو تغيير التاريخ ما يرسل شي، الإرسال التلقائي بس بعد تعديل فعلي
+    if (e.detail !== 'load' && sentDays()[A.date]) { clearTimeout(tmr); tmr = setTimeout(() => publish(false), 600); }
   });
 
   // ---------------- متابعة ردود اليوم ----------------
