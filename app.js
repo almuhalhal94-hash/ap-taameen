@@ -869,6 +869,16 @@
   function renderRoles() {
     const box = $('#roleList'); if (!box) return;
     const man = new Set(db.settings.manualOnly || []), co = new Set(db.settings.coords || []);
+    const names = ids => ids.length ? ids.map(id => `<span class="rn">${esc(nm(id).replace(/^أ\.\s*/, ''))}</span>`).join('') : '<span class="muted">لا أحد</span>';
+    const sups = Object.keys(db.settings.supervise || {}).filter(id => supOf(id).length && byId[id]);
+    $('#rolesSum').innerHTML = `
+      <div class="rule"><i class="r-nc">⛔</i><div><b>مستثنى من التأمين نهائيًا</b><small>لظرف صحي — ما يدخل التأمين ولا المراقبة أبدًا</small><div class="rns">${names([...NO_COVER].filter(id => byId[id]))}</div></div></div>
+      <div class="rule"><i class="r-man">✋</i><div><b>يدوي فقط (التربية الرياضية)</b><small>ما ينختارون تلقائيًا ولا بعد اعتذار أحد — الإدارة تختارهم بنفسها من «تغيير» إذا بغت</small><div class="rns">${names([...man])}</div></div></div>
+      <div class="rule"><i class="r-co">⚠</i><div><b>المنسقون والمعلمون الأوائل — للضرورة فقط</b><small>يُجرَّب كل المعلمين قبلهم، ولو اضطر البرنامج يعطيهم تطلع علامة برتقالية</small><div class="rns">${names([...co])}</div></div></div>
+      <div class="rule"><i class="r-sup">👁</i><div><b>المشرفون — صفوف إشرافهم فقط</b><small>ما يأمّنون إلا صفوف المراحل اللي يشرفون عليها (وتتعدّل من «المعلمون»)</small><div class="rns">${sups.map(id => `<span class="rn">${esc(nm(id).replace(/^أ\.\s*/, ''))} <small>${esc(supLabel(id))}</small></span>`).join('') || '<span class="muted">لا أحد</span>'}</div></div></div>
+      <div class="rule"><i class="r-gen">١</i><div><b>تأمين واحد باليوم للمعلم</b><small>الثاني للضرورة فقط مع تنبيه، والثالث ممنوع نهائيًا (يروح للإدارة)</small></div></div>
+      <div class="rule"><i class="r-gen">☕</i><div><b>مراقبة الفسحة</b><small>ما تُعطى لمن عنده حصة قبل الفسحة أو بعدها مباشرة</small></div></div>
+      <div class="rule"><i class="r-gen">⚖</i><div><b>القسم أولًا ثم العدل</b><small>نفس قسم الغائب أولًا، ثم الأقل تأمينًا في السجل، ثم الأخف حصصًا في ذلك اليوم</small></div></div>`;
     box.innerHTML = deptOrder.map(dep => `<div class="dept"><h3>${esc(dep)}</h3><div class="chips">${T.filter(t => t.dept === dep).map(t => {
       const st = NO_COVER.has(t.id) ? 'nc' : man.has(t.id) ? 'man' : co.has(t.id) ? 'co' : '';
       const lbl = { nc: 'مستثنى', man: 'يدوي فقط', co: 'منسق — للضرورة' }[st] || '';
