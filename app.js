@@ -58,7 +58,7 @@
 
   // ---------------- التخزين ----------------
   const defaults = () => ({
-    settings: { principal: '', assistant: '', coverMode: 'auto', swapMode: 'auto', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم' },
+    settings: { principal: '', assistant: '', coverMode: 'auto', swapMode: 'auto', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم', manualOnly: ['t38', 't39', 't40'], coords: [] },
     avail: {},     // tid -> {released, days}
     history: {}    // 'YYYY-MM-DD' -> {absent:{tid:[slots]}, rows:[], swaps:[], savedAt}
   });
@@ -373,12 +373,14 @@
     const CAP = Math.max(2, db.settings.maxPerDay || 1);
     const list = T.filter(t => !NO_COVER.has(t.id) && (all[t.id] || 0) < CAP && presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOutIv(t.id, iv) && !ctx.busyIv(t.id, iv) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c, s));
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
+    const manS = new Set(db.settings.manualOnly || []), coS = new Set(db.settings.coords || []);
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
       const run = runAfter(ctx, t.id, s, extra[t.id] || []);
       const nAll = all[t.id] || 0;
+      const man = manS.has(t.id), coord = coS.has(t.id);
       if (isB) {
         // بديل المراقبة: ما يكون عنده حصة قبل الفسحة أو بعدها مباشرة، ثم معلمو المراقبة، والأخف نصابًا، وواحدة باليوم
         const i = SLOT_ORDER.indexOf(s), nb = [SLOT_ORDER[i - 1], SLOT_ORDER[i + 1]].filter(Boolean);
@@ -386,12 +388,12 @@
         const adjS = nb.filter(x => ex.includes(x) || (ctx.cell(t.id, x) && !NON_TEACHING.has(ctx.cell(t.id, x).t)));
         const adj = adjS.length;
         const over = n >= 1 || nAll >= db.settings.maxPerDay, duty = DUTY_T.has(t.id), consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, swp: inSwap.has(t.id), key: [over ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
+        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, man, coord, swp: inSwap.has(t.id), key: [man ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
       }
       const over = n >= db.settings.maxPerDay || nAll >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-      return { t, h, n, nAll, same, load, run, over, swp: inSwap.has(t.id), key: [over ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
+      return { t, h, n, nAll, same, load, run, over, man, coord, swp: inSwap.has(t.id), key: [man ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
     }).sort((a, b) => sortKey(a.key, b.key) || a.t.name.localeCompare(b.t.name, 'ar'));
   }
 
@@ -404,7 +406,9 @@
   function assignOne(r, rows, hist, ctx) {
     // الأصل تأمين واحد باليوم؛ وإذا ما فيه أحد، للضرورة القصوى يُعطى تأمين ثانٍ مع تنبيه للإداري، وبعدها الإدارة
     const cs = candidates(r, rows, hist, ctx);
-    const best = cs.find(c => !c.over) || cs[0];
+    // الرياضة (يدوي فقط) ما تنختار تلقائيًا أبدًا، والمنسق للضرورة قبل التأمين الثاني
+    const auto = cs.filter(c => !c.man);
+    const best = auto.find(c => !c.over && !c.coord) || auto.find(c => !c.over) || auto[0];
     r.sub = best ? best.t.id : (emergencyFree(r, rows)[0] || '');
   }
 
@@ -424,7 +428,7 @@
     const pending = rows.filter(r => !r.m);
     pending.forEach(r => { r.sub = ''; });
     while (pending.length && db.settings.coverMode !== 'manual') {
-      pending.forEach(r => { const cs = candidates(r, rows, hist, ctx); r._n = cs.filter(c => !c.over).length + (cs.length ? .5 : 0); });
+      pending.forEach(r => { const cs = candidates(r, rows, hist, ctx); r._n = cs.filter(c => !c.over && !c.man && !c.coord).length + (cs.some(c => !c.man) ? .5 : 0); });
       pending.sort((a, b) => a._n - b._n || slotIdx(a.slot) - slotIdx(b.slot));
       const r = pending.shift();
       assignOne(r, rows, hist, ctx);
@@ -513,7 +517,7 @@
   }
   // ملاحظة المرشّح بكلام بسيط
   const candNote = (c, r) => [c.same ? 'نفس القسم' : c.t.dept, c.h ? `أمّن سابقًا ${arNum(c.h)} ${c.h > 2 ? 'مرات' : 'مرة'}` : 'ما أمّن سابقًا', `نصابه اليوم ${arNum(c.load)} ${c.load > 2 && c.load < 11 ? 'حصص' : 'حصة'}`, c.swp ? 'عنده تبديل اليوم' : ''].filter(Boolean).join('، ');
-  const candWarn = (c, r, all) => [c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
+  const candWarn = (c, r, all) => [all && c.man ? 'معلم رياضة — اختيار يدوي من الإدارة' : '', c.coord ? 'منسق القسم — للضرورة فقط' : '', c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
   function rowInfo(r, i, hist, ctx) {
     const cands = candidates(r, state.rows, hist, ctx);
     const cur = cands.find(c => c.t.id === r.sub);
@@ -580,7 +584,8 @@
     const r = state.rows[pickRow]; if (!r) return;
     const hist = historyCounts(date), ctx = context();
     const cs = candidates(r, state.rows, hist, ctx);
-    const list = [...cs.filter(c => !c.over), ...cs.filter(c => c.over)];
+    const manL = cs.filter(c => c.man), base = cs.filter(c => !c.man);
+    const list = [...base.filter(c => !c.over && !c.coord), ...base.filter(c => !c.over && c.coord), ...base.filter(c => c.over)];
     const shown = pickAll ? list : list.slice(0, 5);
     const sp = slotPlain(r.slot, r.c);
     $('#pkHead').innerHTML = `<small>بدل ${esc(nm(r.absent))}</small><b>الحصة ${esc(sp.name)} · ${BREAKS.has(r.slot) ? 'مراقبة' : codeHTML(r.c)}</b><small>${esc(r.t)} · <bdi dir="ltr">${sp.time}</bdi></small>`;
@@ -592,6 +597,7 @@
     if (isE(r.sub) && !emg.includes(r.sub)) emg.unshift(r.sub);
     $('#pkList').innerHTML = (shown.map(item).join('') || '<p class="muted">ما فيه معلم متاح في هذي الحصة.</p>')
       + (list.length > 5 && !pickAll ? `<button class="pk-more" data-pkall>عرض الباقين (${arNum(list.length - 5)})</button>` : '')
+      + (manL.length ? `<h4>معلمو الرياضة — اختيار يدوي فقط</h4>${manL.map((c, k) => item(c, list.length + k)).join('')}` : '')
       + (emg.length ? `<h4>أو الإدارة تؤمّن</h4><div class="pk-emg">${emg.map(id => `<button class="pk sm ${id === r.sub ? 'on' : ''}" data-pk="${esc(id)}"><span><b>🛡 ${esc(nm(id))}</b></span>${id === r.sub ? '<s>✓</s>' : ''}</button>`).join('')}</div>` : '');
     $('#pkRefuse').hidden = !(r.sub && !isE(r.sub));
     $('#pkRefuse').textContent = r.sub ? `${nm(r.sub)} اعتذر ← حوّل للتالي` : '';
@@ -853,8 +859,29 @@
     $('#setMax').value = String(s.maxPerDay); $('#setDept').checked = s.deptFirst;
     $('#setBreak').checked = s.coverBreak; $('#setConsec').checked = s.avoidConsec;
     $('#setEmg').value = s.emergency || '';
+    renderRoles();
     $('#sourceNote').textContent = `مصدر الجدول: ${window.TIMETABLE.source} — ${T.length} معلمًا`;
   }
+
+  // أدوار خاصة: يدوي فقط (الرياضة) والمنسقون (للضرورة)
+  function renderRoles() {
+    const box = $('#roleList'); if (!box) return;
+    const man = new Set(db.settings.manualOnly || []), co = new Set(db.settings.coords || []);
+    box.innerHTML = deptOrder.map(dep => `<div class="dept"><h3>${esc(dep)}</h3><div class="chips">${T.filter(t => t.dept === dep).map(t => {
+      const st = NO_COVER.has(t.id) ? 'nc' : man.has(t.id) ? 'man' : co.has(t.id) ? 'co' : '';
+      const lbl = { nc: 'مستثنى', man: 'يدوي فقط', co: 'منسق — للضرورة' }[st] || '';
+      return `<button class="chip role ${st}" data-role="${t.id}" ${st === 'nc' ? 'disabled' : ''}>${esc(t.name)}${lbl ? ` <span class="tag">${lbl}</span>` : ''}</button>`;
+    }).join('')}</div></div>`).join('');
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-role]'); if (!b) return;
+    const id = b.dataset.role, s = db.settings;
+    const man = new Set(s.manualOnly || []), co = new Set(s.coords || []);
+    // عادي ← منسق ← يدوي فقط ← عادي
+    if (co.has(id)) { co.delete(id); man.add(id); } else if (man.has(id)) man.delete(id); else co.add(id);
+    s.manualOnly = [...man]; s.coords = [...co]; persist(); cloudConfig();
+    renderRoles(); recompute(); toast(`${nm(id)}: ${co.has(id) ? 'منسق — للضرورة فقط' : man.has(id) ? 'يدوي فقط' : 'عادي'}`);
+  });
 
   // ---------------- الأحداث ----------------
   function showTab(name) {
@@ -1045,7 +1072,7 @@
     refreshSum() { if (D() !== -1) renderSummary(); },
     saveSettings() { persist(); cloudConfig(); },
     // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
-    ranked(row) { const cs = candidates(row, state.rows, historyCounts(date), context()); return [...cs.filter(c => !c.over), ...cs.filter(c => c.over)].map(c => c.t.id); },
+    ranked(row) { const cs = candidates(row, state.rows, historyCounts(date), context()).filter(c => !c.man); return [...cs.filter(c => !c.over && !c.coord), ...cs.filter(c => !c.over && c.coord), ...cs.filter(c => c.over)].map(c => c.t.id); },
     // طلب تبديل من معلم (من التطبيق): يرتّبه تلقائيًا بنفس قواعد التبديل، ويفضّل الزميل المقترح إن أمكن
     swapRequest(iso, a, slots, reason, prefer) {
       if (iso !== date) { $('#dateInput').value = iso; swDraft = newDraft(); loadDate(iso); }

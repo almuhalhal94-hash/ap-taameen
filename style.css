@@ -531,3 +531,7 @@ h2{font-size:1.45rem}
 .pk-note{margin:8px 0 14px!important}
 .sumnums .need.bad{border-color:#c62828;background:rgba(198,40,40,.07)}
 .sumnums .need.bad b{color:#c62828}
+
+.chip.role.co{background:rgba(232,115,12,.1);border-color:#e8730c}
+.chip.role.man{background:rgba(37,99,168,.1);border-color:#2563a8}
+.chip.role.nc{opacity:.55;cursor:not-allowed}
