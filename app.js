@@ -885,15 +885,20 @@
       return `<button class="chip role ${st}" data-role="${t.id}" ${st === 'nc' ? 'disabled' : ''}>${esc(t.name)}${lbl ? ` <span class="tag">${lbl}</span>` : ''}</button>`;
     }).join('')}</div></div>`).join('');
   }
-  document.addEventListener('click', e => {
+  document.addEventListener('click', async e => {
     if (!e.target.closest('#btnRolesReset')) return;
+    const nl = ids => ids.map(nm).join('، ');
+    if (!(await ask(`متأكد تريد إرجاع القائمة المعتمدة؟\nالمنسقون: ${nl(defaults().settings.coords)}\nيدوي فقط: ${nl(defaults().settings.manualOnly)}`, 'نعم، أرجعها'))) return;
     db.settings.coords = defaults().settings.coords; db.settings.manualOnly = defaults().settings.manualOnly;
     persist(); cloudConfig(); renderRoles(); recompute(); toast('رجعت القائمة المعتمدة');
   });
-  document.addEventListener('click', e => {
+  document.addEventListener('click', async e => {
     const b = e.target.closest('[data-role]'); if (!b) return;
     const id = b.dataset.role, s = db.settings;
     const man = new Set(s.manualOnly || []), co = new Set(s.coords || []);
+    const ST = { n: 'عادي (يدخل التأمين التلقائي)', c: 'منسق — للضرورة فقط', m: 'يدوي فقط (ما ينختار تلقائيًا)' };
+    const from = co.has(id) ? 'c' : man.has(id) ? 'm' : 'n', to = { n: 'c', c: 'm', m: 'n' }[from];
+    if (!(await ask(`متأكد تريد تحويل ${nm(id)}\nمن: ${ST[from]}\nإلى: ${ST[to]}؟`, 'نعم، حوّله'))) return;
     // عادي ← منسق ← يدوي فقط ← عادي
     if (co.has(id)) { co.delete(id); man.add(id); } else if (man.has(id)) man.delete(id); else co.add(id);
     s.manualOnly = [...man]; s.coords = [...co]; persist(); cloudConfig();
@@ -940,16 +945,17 @@
     afterChange();
   });
 
-  $('#btnRedistribute').addEventListener('click', () => { recompute(true); renderAll(); toast('تمت إعادة التوزيع'); });
+  $('#btnRedistribute').addEventListener('click', async () => { if (!(await ask('متأكد تريد إعادة التوزيع؟\nكل اختياراتك اليدوية في هذا اليوم تنلغي، والبرنامج يوزّع من جديد.', 'نعم، أعد التوزيع'))) return; recompute(true); renderAll(); toast('تمت إعادة التوزيع'); });
   $('#resTable').addEventListener('click', e => { const b = e.target.closest('[data-chg]'); if (b) openPick(+b.dataset.chg); });
-  $('#pickModal').addEventListener('click', e => {
+  $('#pickModal').addEventListener('click', async e => {
     if (e.target.id === 'pickModal' || e.target.closest('[data-pkclose]')) return closePick();
     if (e.target.closest('[data-pkall]')) { pickAll = true; return renderPick(); }
     const r = state.rows[pickRow]; if (!r) return;
     const pk = e.target.closest('[data-pk]');
     if (pk) { r.sub = pk.dataset.pk; r.m = true; commit(); renderResults(); closePick(); toast(`المؤمّن: ${nm(r.sub)}`); return; }
-    if (e.target.closest('#pkNone')) { r.sub = ''; r.m = true; commit(); renderResults(); renderPick(); return; }
+    if (e.target.closest('#pkNone')) { if (!(await ask(`متأكد تريد ترك الحصة ${slotPlain(r.slot, r.c).name} بدل ${nm(r.absent)} بدون تأمين؟\n(${nm(r.sub)} ينشال منها)`, 'نعم، بدون تأمين'))) return; r.sub = ''; r.m = true; commit(); renderResults(); renderPick(); return; }
     if (e.target.closest('#pkRefuse')) {
+      if (!(await ask(`متأكد إن ${nm(r.sub)} اعتذر عن الحصة ${slotPlain(r.slot, r.c).name}؟\nبتنتقل للمعلم اللي بعده تلقائيًا.`, 'نعم، اعتذر'))) return;
       r.refused = [...(r.refused || []), r.sub]; r.m = false;
       assignOne(r, state.rows, historyCounts(date), context());
       commit(); renderResults(); renderPick();
@@ -961,8 +967,11 @@
     const g = e.target.closest('[data-go]'); if (!g) return;
     const el = document.getElementById(g.dataset.go); if (el && !el.hidden) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
-  document.addEventListener('click', e => {
+  document.addEventListener('click', async e => {
     const b = e.target.closest('[data-mode]'); if (!b) return;
+    if (db.settings[b.dataset.key] === b.dataset.mode) return;
+    const what = b.dataset.key === 'coverMode' ? 'التأمين' : 'التبديل';
+    if (!(await ask(b.dataset.mode === 'manual' ? `متأكد تريد تحويل ${what} إلى «يدوي»؟\nالتوزيع التلقائي ينشال، وتختار أنت لكل حصة.` : `متأكد تريد تحويل ${what} إلى «تلقائي»؟\nالبرنامج يوزّع الحصص اللي ما اخترتها بنفسك.`, 'نعم، حوّل'))) return;
     db.settings[b.dataset.key] = b.dataset.mode; persist(); cloudConfig();
     recompute(); renderAll(); renderModes();
     toast(b.dataset.mode === 'manual' ? 'صار الاختيار يدوي — اختر من المرتّبين' : 'صار التوزيع تلقائي');
