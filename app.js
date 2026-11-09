@@ -74,8 +74,9 @@
       if (!p.clean1) { db.history = {}; db.needSave = true; }
       // مسح التجارب الثاني (8 نوفمبر): السجل وأيام الإرسال
       if (!p.clean2) { db.history = {}; db.settings.sentDays = {}; db.needSave = true; }
+      if (!p.clean3) { db.history = {}; db.settings.sentDays = {}; db.needSave = true; }
     }
-    db.clean1 = true; db.clean2 = true;
+    db.clean1 = true; db.clean2 = true; db.clean3 = true;
   } catch (e) { /* يبدأ فاضي */ }
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify(db)); } catch (e) { toast('تعذّر الحفظ في المتصفح'); } };
   if (db.needSave) { delete db.needSave; persist(); }
