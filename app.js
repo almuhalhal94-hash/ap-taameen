@@ -76,9 +76,9 @@
       if (!p.clean2) { db.history = {}; db.settings.sentDays = {}; db.needSave = true; }
       if (!p.clean3) { db.history = {}; db.settings.sentDays = {}; db.needSave = true; }
       // قائمة المنسقين والرياضة المعتمدة (9 نوفمبر) مرة وحدة
-      if (!p.roles1) { db.settings.coords = defaults().settings.coords; db.settings.manualOnly = defaults().settings.manualOnly; db.needSave = true; }
+      if (!p.roles2) { db.settings.coords = defaults().settings.coords; db.settings.manualOnly = defaults().settings.manualOnly; db.needSave = true; }
     }
-    db.clean1 = true; db.clean2 = true; db.clean3 = true; db.roles1 = true;
+    db.clean1 = true; db.clean2 = true; db.clean3 = true; db.roles1 = true; db.roles2 = true;
   } catch (e) { /* يبدأ فاضي */ }
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify(db)); } catch (e) { toast('تعذّر الحفظ في المتصفح'); } };
   if (db.needSave) { delete db.needSave; persist(); }
@@ -885,6 +885,11 @@
       return `<button class="chip role ${st}" data-role="${t.id}" ${st === 'nc' ? 'disabled' : ''}>${esc(t.name)}${lbl ? ` <span class="tag">${lbl}</span>` : ''}</button>`;
     }).join('')}</div></div>`).join('');
   }
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#btnRolesReset')) return;
+    db.settings.coords = defaults().settings.coords; db.settings.manualOnly = defaults().settings.manualOnly;
+    persist(); cloudConfig(); renderRoles(); recompute(); toast('رجعت القائمة المعتمدة');
+  });
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-role]'); if (!b) return;
     const id = b.dataset.role, s = db.settings;
