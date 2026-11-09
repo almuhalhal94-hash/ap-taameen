@@ -58,7 +58,7 @@
 
   // ---------------- التخزين ----------------
   const defaults = () => ({
-    settings: { principal: '', assistant: '', coverMode: 'auto', swapMode: 'auto', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم', manualOnly: ['t38', 't39', 't40'], coords: [] },
+    settings: { principal: '', assistant: '', coverMode: 'auto', swapMode: 'auto', maxPerDay: 1, deptFirst: true, coverBreak: true, avoidConsec: true, supervise: { t30: ['1ع3', '2ع3', '3ع3', '4ع3'], t14: ['3ع2', '4ع2'], t25: ['1ع2', '2ع2'], t29: ['1ب6', '2ب6', '3ب6', '4ب6'], t31: ['1ب6', '2ب6', '3ب6', '4ب6'], t26: ['1ع1', '2ع1', '3ع1', '4ع1'] }, emergency: 'المدير المساعد\nالأخصائي الاجتماعي\nأخصائي تكنولوجيا التعليم\nأمين مصادر التعلم', manualOnly: ['t38', 't39', 't40'], coords: ['t1', 't5', 't10', 't14', 't25', 't29'] },
     avail: {},     // tid -> {released, days}
     history: {}    // 'YYYY-MM-DD' -> {absent:{tid:[slots]}, rows:[], swaps:[], savedAt}
   });
@@ -76,7 +76,9 @@
       if (!p.clean2) { db.history = {}; db.settings.sentDays = {}; db.needSave = true; }
       if (!p.clean3) { db.history = {}; db.settings.sentDays = {}; db.needSave = true; }
     }
-    db.clean1 = true; db.clean2 = true; db.clean3 = true;
+      // قائمة المنسقين والرياضة المعتمدة (9 نوفمبر) مرة وحدة
+      if (!p.roles1) { db.settings.coords = defaults().settings.coords; db.settings.manualOnly = defaults().settings.manualOnly; db.needSave = true; }
+    db.clean1 = true; db.clean2 = true; db.clean3 = true; db.roles1 = true;
   } catch (e) { /* يبدأ فاضي */ }
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify(db)); } catch (e) { toast('تعذّر الحفظ في المتصفح'); } };
   if (db.needSave) { delete db.needSave; persist(); }
