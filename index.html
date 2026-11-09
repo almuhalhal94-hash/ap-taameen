@@ -271,6 +271,16 @@
 <script src="data.js"></script>
 <script src="duties.js"></script>
 <script src="app.js"></script>
+<div id="newVer" class="newver" hidden>✨ فيه تحديث جديد للبرنامج <button class="btn sm" onclick="location.reload()">حدّث الآن</button></div>
+<script>
+// يتأكد كل دقيقة إذا انرفعت نسخة جديدة، ويطلب التحديث عشان ما تشتغل على نسخة قديمة
+(function () {
+  let base = null;
+  const sig = () => Promise.all(['app.js', 'admin-sync.js', 'index.html'].map(f => fetch(f, { cache: 'no-store' }).then(r => r.text()).catch(() => ''))).then(a => a.map(x => x.length).join('-'));
+  sig().then(v => base = v);
+  setInterval(() => sig().then(v => { if (base && v && v !== base && !v.startsWith('0')) document.getElementById('newVer').hidden = false; }), 60000);
+})();
+</script>
 <script src="firebase-config.js"></script>
 <script src="sync.js"></script>
 <script src="admin-sync.js"></script>
