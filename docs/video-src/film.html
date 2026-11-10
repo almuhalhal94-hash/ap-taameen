@@ -243,7 +243,7 @@ const SPINS = [[14.25, 14.95], [17.85, 18.55], [48.05, 48.8]];
 
 // ================= النصوص =================
 const TT = [   // [t0, t1, title, sub, chips[[txt, tOn]], badge]
-  [6.6, 8.5, 'امسح الباركود', 'بكاميرا جوالك', [], 1],
+  [6.6, 8.5, 'امسح الباركود', 'بكاميرا تلفونك', [], 1],
   [8.6, 14.3, 'على الآيفون', '', [['Safari', 10.04], ['مشاركة', 11.2], ['إضافة إلى الشاشة الرئيسية', 12.6]], 1],
   [14.45, 17.84, 'على الأندرويد', '', [['Chrome', 15.5], ['تثبيت التطبيق', 16.7]], 1],
   [18.3, 23.58, 'رمزك من 6 أرقام', 'يوصلك من الإدارة', [['🔒 لا تشاركه مع أحد', 22.45]], 2, { sub: 21.12, title: 18.9 }],
@@ -260,7 +260,7 @@ const BADGE = { 1: 'التثبيت', 2: 'الدخول', 3: 'بطاقة التك�
 const words = (s, cls = '') => s.split(' ').map(w => `<span class="clip"><span class="w ${cls}">${w}</span></span>`).join(' ');
 const tts = $('#tts');
 tts.innerHTML = TT.map((c, i) => `<div class="blk" id="b${i}" style="position:absolute;inset:0;opacity:0"><div class="tt">${words(c[2])}</div><div class="sb">${c[3] ? words(c[3]).replace(/class="clip"/g, 'class="clip" style="padding-bottom:6px"') : ''}</div><div class="ch">${c[4].map(x => `<span>${x[0]}</span>`).join(c[5] === 1 ? '<b class="ar">←</b>' : '')}</div></div>`).join('');
-$('#i1').innerHTML = words('تطبيق التأمين والتبديل'); $('#i2').innerHTML = words('مدرسة ابن رشد الإعدادية للبنين'); $('#i3').innerHTML = words('تكليفاتك كلها في جوالك');
+$('#i1').innerHTML = words('تطبيق التأمين والتبديل'); $('#i2').innerHTML = words('مدرسة ابن رشد الإعدادية للبنين'); $('#i3').innerHTML = words('تكليفاتك كلها في تلفونك');
 $('#ea').innerHTML = words('ابدأ الآن');
 const wordAnim = (el, t, t0, gap = .09, dur = .55) => { el.querySelectorAll('.w').forEach((w, i) => { const k = at(t, t0 + i * gap, t0 + i * gap + dur, 'out5'); w.style.transform = `translateY(${(1 - k) * 110}%)`; w.style.opacity = k > 0 ? 1 : 0; }); };
 
