@@ -460,15 +460,26 @@
     const c = codes()[t.id], sc = supCodes()[t.id];
     return `السلام عليكم ${t.name}\nتطبيق التأمين والتبديل — مدرسة ابن رشد:\n${APP_URL}\nرمز دخولك: ${c}${isSup(t.id) ? '\n(نفس الرمز يفتح لك تكليفاتك ومتابعة صفوف إشرافك)' : ''}\nالرمز خاص بك، فضلًا لا تشاركه.`;
   };
+  const DEPT_ORDER = ['التربية الإسلامية', 'اللغة العربية', 'اللغة الإنجليزية', 'الرياضيات', 'العلوم', 'المواد الاجتماعية', 'التصميم والتقانة', 'اللغة الفرنسية', 'التربية الرياضية'];
+  const depts = () => { const ds = [...new Set(A.T.map(t => t.dept))]; return ds.sort((a, b) => (DEPT_ORDER.indexOf(a) + 1 || 99) - (DEPT_ORDER.indexOf(b) + 1 || 99)); };
+  const deptMsg = d => {
+    const C = codes();
+    const ts = A.T.filter(t => t.dept === d && C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    return `رموز دخول قسم ${d}\nتطبيق التأمين والتبديل — مدرسة ابن رشد\nالرابط: ${APP_URL}\n\n` + ts.map(t => `${t.name}: ${C[t.id]}${isSup(t.id) ? ' (معلم + مشرف)' : ''}`).join('\n') + `\n\nكل رمز خاص بصاحبه فقط، فضلًا لا يُصوَّر ولا يُشارَك.\n(الرموز القديمة توقفت)`;
+  };
   function renderLinks() {
-    const C = codes(), SC = supCodes();
+    const C = codes();
     if (!Object.keys(C).length) { $('#linkList').innerHTML = '<p class="muted">اضغط «تجهيز الرموز».</p>'; return; }
-    $('#linkList').innerHTML = `<p class="hint">رابط التطبيق للجميع: <b dir="ltr">${esc(APP_URL)}</b> — وكل واحد يدخل برمزه.</p>` + [...A.T].sort((a, b) => a.name.localeCompare(b.name, 'ar')).filter(t => C[t.id]).map(t =>
-      `<div class="lk"><b>${esc(t.name)}</b><span class="codes"><span class="code-pill" title="رمز الدخول">${C[t.id]}</span>${isSup(t.id) ? '<span class="code-pill sup" title="نفس الرمز للمعلم والمشرف">معلم + مشرف</span>' : ''}</span><span class="btn-row"><button class="btn sm" data-copy="${t.id}">نسخ الرسالة</button></span></div>`).join('');
+    $('#linkList').innerHTML = `<p class="hint">رابط التطبيق للجميع: <b dir="ltr">${esc(APP_URL)}</b> — وكل واحد يدخل برمزه. انسخ رموز كل قسم وأرسلها لمنسقه أو معلمه الأول.</p>` + depts().map(d => {
+      const ts = A.T.filter(t => t.dept === d && C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      if (!ts.length) return '';
+      return `<div class="lk-dept"><div class="lk-dh"><b>${esc(d)}</b><span class="muted">${ts.length} معلم</span><button class="btn sm primary" data-copyd="${esc(d)}">نسخ رموز القسم</button></div>` + ts.map(t =>
+        `<div class="lk"><b>${esc(t.name)}</b><span class="codes"><span class="code-pill" title="رمز الدخول">${C[t.id]}</span>${isSup(t.id) ? '<span class="code-pill sup" title="نفس الرمز للمعلم والمشرف">معلم + مشرف</span>' : ''}</span><span class="btn-row"><button class="btn sm" data-copy="${t.id}">نسخ الرسالة</button></span></div>`).join('') + '</div>';
+    }).join('');
   }
   async function makeCodes(again) {
     const C = codes(), SC = supCodes();
-    if (again && !(await A.ask('تجديد كل الرموز؟ الرموز القديمة تتوقف، ولازم ترسل الجديدة لكل المعلمين.', 'تجديد'))) return;
+    if (again && !(await A.ask('متأكد تريد تجديد رموز كل المعلمين؟\nكل الرموز القديمة تتوقف فورًا، ولازم ترسل الجديدة لكل قسم.', 'نعم، جدّد'))) return;
     const used = new Set([...Object.values(C), ...Object.values(SC)]);
     const old = again ? [...Object.values(C), ...Object.values(SC)] : [];
     if (again) { A.settings.codes = {}; A.settings.supCodes = {}; used.clear(); }
@@ -493,7 +504,7 @@
   $('#btnLinks').addEventListener('click', () => makeCodes(false));
   $('#btnRenew').addEventListener('click', () => makeCodes(true));
   const copy = async txt => { try { await navigator.clipboard.writeText(txt); A.toast('تم النسخ'); } catch (e) { prompt('انسخ:', txt); } };
-  $('#linkList').addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copy(msgFor(A.byId[b.dataset.copy])); });
+  $('#linkList').addEventListener('click', e => { const d = e.target.closest('[data-copyd]'); if (d) return copy(deptMsg(d.dataset.copyd)); const b = e.target.closest('[data-copy]'); if (b) copy(msgFor(A.byId[b.dataset.copy])); });
   $('#btnCopyAll').addEventListener('click', () => {
     const C = codes(); if (!Object.keys(C).length) return A.toast('جهّز الرموز أول');
     copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${isSup(t.id) ? ' (معلم + مشرف)' : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
