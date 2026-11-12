@@ -262,3 +262,13 @@ button,a,[data-p]{touch-action:manipulation}
 .rq-per button.on .cls{color:#2b0408;background:#e2b45a;border-radius:6px;padding:0 5px}
 .rq-per button.on{background:linear-gradient(160deg,rgba(226,180,90,.32),rgba(226,180,90,.14));box-shadow:0 0 0 2px rgba(226,180,90,.35)}
 .rq-none{grid-column:1/-1;text-align:center;color:var(--muted);padding:12px;border:1px dashed var(--line);border-radius:12px;margin:0}
+/* طلب تأمين حصص — غياب بعذر رسمي */
+.req-btn.abs{margin-bottom:0;background:linear-gradient(135deg,#f3e3d0,#e9cfa4)}
+.req-btn.abs i{background:#1f5f4a;color:#fff}
+.req-btn.abs + .req-btn{margin-top:10px}
+.sh-ic.abs{color:#f6d690;background:rgba(31,95,74,.35);border:2px solid rgba(110,200,160,.5)}
+.ab-kinds{display:flex;flex-wrap:wrap;gap:7px}
+.ab-kinds button{padding:8px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface2);color:var(--ink);font:inherit;font-size:.82rem;cursor:pointer}
+.ab-kinds button.on{background:rgba(226,180,90,.16);border-color:#e2b45a;color:#f6d690;font-weight:700}
+.ab-pledge{display:flex;gap:8px;align-items:flex-start;margin:12px 0 2px;font-size:.85rem;line-height:1.6;cursor:pointer}
+.ab-pledge input{width:18px;height:18px;margin-top:3px;accent-color:#e2b45a;flex:none}

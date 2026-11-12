@@ -1129,6 +1129,21 @@
       const skipped = slots.filter(x => !own.includes(x)).map(x => SLOT_NAME[x]);
       return { result: res, skipped };
     },
+    // طلب تأمين حصص (غياب بعذر رسمي) من التطبيق: يسجّل المعلم غائبًا في حصصه المطلوبة ويوزّع التأمين بنفس القواعد
+    absenceRequest(iso, a, slots, full) {
+      if (!byId[a]) return { err: 'المعلم غير موجود في الجدول.' };
+      if (iso !== date) { $('#dateInput').value = iso; swDraft = newDraft(); loadDate(iso); }
+      if (D() === -1) return { err: 'هذا اليوم ما فيه دوام.' };
+      const ctx = context();
+      const cells = dayCells(ctx, a).filter(x => coverable(x.cell)).map(x => x.s);
+      const own = full ? cells : cells.filter(x => slots.includes(x));
+      if (!own.length) return { err: `${nm(a)} ما عنده حصص تحتاج تأمين في هذا اليوم.` };
+      state.absent[a] = [...new Set([...(state.absent[a] || []), ...own])];
+      state.swaps = state.swaps.filter(sw => sw.a !== a);
+      afterChange(); commit();
+      const rows = state.rows.filter(r => r.absent === a);
+      return { n: rows.length, covered: rows.filter(r => r.sub).length };
+    },
     openSwap() { document.querySelector('.tab[data-tab="swaps"]').click(); },
     swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },
     // يطبّق رد معلم: اعتذار (يضاف للمعتذرين) والبديل الجديد اللي اختاره التطبيق

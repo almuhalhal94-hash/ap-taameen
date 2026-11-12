@@ -411,9 +411,9 @@
   // ---------- المحادثة ----------
   S.watch('msgs', ['tid', '==', ME], all => {
     const list = all.filter(m => !m.type);
-    reqs = all.filter(m => m.type === 'req' && m.status !== 'cancelled').sort((a, b) => b.at - a.at);
-    reqs.filter(q => q.status === 'approved').forEach(q => alertNew('q:' + q.id + ':ok', '✓ وافقت الإدارة على طلب التبديل', `${reqDay(q)} — ${(q.result || []).map(x => x.txt).join('، ') || 'تم الترتيب'}`));
-    reqs.filter(q => q.status === 'declined').forEach(q => alertNew('q:' + q.id + ':no', 'طلب التبديل ما اعتُمد', `${reqDay(q)}${q.adminNote ? ' — ' + q.adminNote : ''}`));
+    reqs = all.filter(m => (m.type === 'req' || m.type === 'absreq') && m.status !== 'cancelled').sort((a, b) => b.at - a.at);
+    reqs.filter(q => q.status === 'approved').forEach(q => alertNew('q:' + q.id + ':ok', q.type === 'absreq' ? '✓ اعتمدت الإدارة طلب تأمين حصصك' : '✓ وافقت الإدارة على طلب التبديل', `${reqDay(q)} — ${(q.result || []).map(x => x.txt).join('، ') || 'تم الترتيب'}`));
+    reqs.filter(q => q.status === 'declined').forEach(q => alertNew('q:' + q.id + ':no', q.type === 'absreq' ? 'طلب تأمين الحصص ما اعتُمد' : 'طلب التبديل ما اعتُمد', `${reqDay(q)}${q.adminNote ? ' — ' + q.adminNote : ''}`));
     renderReqs();
     msgs = list.sort((a, b) => a.at - b.at);
     msgs.filter(m => m.from === 'admin').forEach(m => alertNew('m:' + m.id, '✉ رسالة من الإدارة', m.text.slice(0, 120)));
@@ -440,9 +440,9 @@
     const ST = { pending: ['wait', 'بانتظار رد الإدارة'], approved: ['ok', 'تمت الموافقة ✓'], declined: ['bad', 'ما اعتُمد'] };
     $('#reqList').innerHTML = reqs.filter(q => q.date >= TODAY).map(q => {
       const st = ST[q.status] || ST.pending;
-      const res = q.status === 'approved' && (q.result || []).length ? `<div class="s rq-res">${q.result.map(x => `<span class="${x.ok ? '' : 'rq-warn'}">${x.ok ? '⇄' : '⚠'} ${esc(x.txt)}</span>`).join('<br>')}</div>` : '';
-      return `<div class="item rq rq-${st[0]}"><span class="dot ${st[0] === 'bad' ? 'bad' : ''}"></span><div class="grow"><div class="t">طلب تبديل — ${esc(reqDay(q))}</div>
-        <div class="s">الحصص: ${q.slots.map(k => perName(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '')).join('، ')} · السبب: ${esc(q.reason)}</div>${res}${q.adminNote ? `<div class="s rq-note">الإدارة: ${esc(q.adminNote)}</div>` : ''}</div>
+      const res = q.status === 'approved' && (q.result || []).length ? `<div class="s rq-res">${q.result.map(x => `<span class="${x.ok ? '' : 'rq-warn'}">${x.ok ? (q.type === 'absreq' ? '✓' : '⇄') : '⚠'} ${esc(x.txt)}</span>`).join('<br>')}</div>` : '';
+      return `<div class="item rq rq-${st[0]}"><span class="dot ${st[0] === 'bad' ? 'bad' : ''}"></span><div class="grow"><div class="t">${q.type === 'absreq' ? 'طلب تأمين حصص (غياب بعذر رسمي)' : 'طلب تبديل'} — ${esc(reqDay(q))}</div>
+        <div class="s">الحصص: ${q.full ? 'اليوم كامل' : q.slots.map(k => perName(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '')).join('، ')} · ${q.type === 'absreq' ? 'العذر: ' + esc(q.kindTxt || '') + (q.reason ? ' — ' + esc(q.reason) : '') : 'السبب: ' + esc(q.reason)}</div>${res}${q.adminNote ? `<div class="s rq-note">الإدارة: ${esc(q.adminNote)}</div>` : ''}</div>
         <div class="side"><span class="tag ${st[0] === 'ok' ? 'ok' : ''}">${st[1]}</span>${q.status === 'pending' ? `<button class="mini" data-rq-cancel="${q.id}">إلغاء الطلب</button>` : ''}</div></div>`;
     }).join('');
   }
@@ -503,6 +503,67 @@
     if (!v) return;
     await S.add('msgs', { type: 'req', tid: ME, name: me.name, from: 'teacher', ...v, status: 'pending', at: now(), readA: false, readT: true });
     SND('send'); buzz(20); toast('انرسل طلبك للمدير المساعد');
+  });
+  // ---------- طلب تأمين حصص: غياب بعذر رسمي (قبل بيوم أو أكثر) ----------
+  const ABS_KINDS = ['موعد طبي رسمي', 'إجازة مرضية', 'مهمة عمل رسمية', 'دورة أو ورشة تدريبية', 'ظرف عائلي طارئ', 'إجازة رسمية معتمدة', 'عذر رسمي آخر'];
+  const nextWork = (from, add) => { const d = new Date(from); d.setDate(d.getDate() + add); while (d.getDay() > 4) d.setDate(d.getDate() + 1); return isoOf(d); };
+  $('#btnAbs').addEventListener('click', async () => {
+    SND('tap');
+    const MIN = nextWork(new Date(), 1), MAXD = new Date(); MAXD.setDate(MAXD.getDate() + 60); const MAX = isoOf(MAXD);
+    const picked = new Set(); let kind = '';
+    const myT = ((window.TIMETABLE || {}).teachers || []).find(t => t.id === me.tid);
+    const wdOf = v => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
+    const myDay = v => { if (!v) return []; const wd = wdOf(v); if (wd > 4 || !myT || (myT.days && !myT.days.includes(wd))) return []; return Object.keys(PER).map(k => ({ k, c: myT.cells[wd + '-' + k] })).filter(x => x.c && x.c.t === 'حصة').map(x => ({ k: x.k, cls: x.c.c })); };
+    const v = await sheet(`<div class="sh-ic abs">✉</div><h3>طلب تأمين حصص</h3>
+      <p class="sh-sum">في حال <b>غيابك عن العمل بعذر رسمي</b> معروف مسبقًا، قدّم الطلب <b>قبل موعد الغياب بيوم عمل على الأقل</b>، لتتمكّن الإدارة من توزيع حصصك على الزملاء وإبلاغهم في وقت مناسب.</p>
+      <p class="lbl">يوم الغياب <span class="req">*</span></p><input type="date" id="abDate" class="rq-in" min="${MIN}" max="${MAX}" value="${MIN}"><p class="rq-sel" id="abDay"></p>
+      <p class="lbl">نوع العذر <span class="req">*</span></p><div class="ab-kinds" id="abKinds">${ABS_KINDS.map(k => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>
+      <p class="lbl">الحصص المطلوب تأمينها <span class="req">*</span> <small class="muted">— محدّدة كلها، اضغط لإلغاء ما لا يلزم</small></p><div class="rq-per" id="abPer"></div>
+      <p class="rq-sel" id="abSel"></p>
+      <p class="lbl">تفاصيل العذر <small class="muted">(اختياري)</small></p><textarea id="abWhy" rows="2" placeholder="مثال: موعد في المستشفى الساعة 9 صباحًا"></textarea>
+      <label class="ab-pledge"><input type="checkbox" id="abOk"> <span>أتعهّد بتقديم ما يُثبت العذر الرسمي للإدارة.</span></label>
+      <p class="err" id="abErr"></p>
+      <div class="sheet-btns"><button class="b-ok" data-x="go">إرسال الطلب للإدارة</button><button class="b-ghost" data-x="close">رجوع</button></div>`, {
+      go: () => {
+        const date = $('#abDate').value, L = myDay(date);
+        const err = !date ? 'اختر يوم الغياب.' : wdOf(date) > 4 ? 'هذا اليوم عطلة نهاية الأسبوع.' : date < MIN ? 'الطلب يُقدَّم قبل الغياب بيوم عمل على الأقل. للغياب اليوم تواصل مع الإدارة مباشرة.' : date > MAX ? 'اختر يومًا خلال الشهرين القادمين.' : wdOf(date) > 4 ? 'هذا اليوم عطلة نهاية الأسبوع.' : !L.length ? 'ما عندك حصص تدريس في هذا اليوم.' : !kind ? 'اختر نوع العذر.' : !picked.size ? 'اختر حصة وحدة على الأقل.' : !$('#abOk').checked ? 'أكّد التعهّد بتقديم ما يُثبت العذر.' : '';
+        if (err) { $('#abErr').textContent = err; buzz(30); return false; }
+        const cls = {}; L.forEach(x => { if (picked.has(x.k)) cls[x.k] = x.cls; });
+        return { date, kindTxt: kind, reason: $('#abWhy').value.trim(), slots: [...picked].sort(), cls, full: picked.size === L.length };
+      }
+    }, () => {
+      const draw = () => {
+        const val = $('#abDate').value, L = myDay(val);
+        $('#abDay').innerHTML = val ? `يوم <b>${weekdayAr(val)}</b> ${new Intl.DateTimeFormat('ar', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(val + 'T12:00'))}` : '';
+        picked.clear(); L.forEach(x => picked.add(x.k));
+        $('#abPer').innerHTML = L.length ? L.map(x => `<button type="button" data-p="${x.k}"><i class="n">${x.k}</i>${PER[x.k]}<span class="cls">${code(x.cls)}</span></button>`).join('') : `<p class="rq-none">${val && wdOf(val) > 4 ? 'هذا اليوم عطلة.' : 'ما عندك حصص تدريس في هذا اليوم.'}</p>`;
+        paint();
+      };
+      const paint = () => {
+        $('#abPer').querySelectorAll('[data-p]').forEach(x => { const on = picked.has(x.dataset.p); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); });
+        const n = picked.size, all = myDay($('#abDate').value).length;
+        $('#abSel').innerHTML = !all ? '' : n === all ? `<b>اليوم كامل</b> — ${n === 1 ? 'حصة واحدة' : n === 2 ? 'حصتان' : n + ' حصص'}` : n ? `${n === 1 ? 'حصة واحدة' : n === 2 ? 'حصتان' : n + ' حصص'}: <b>${[...picked].sort().map(perName).join('، ')}</b>` : 'ما اخترت حصة';
+      };
+      $('#abDate').oninput = $('#abDate').onchange = () => { $('#abErr').textContent = ''; draw(); };
+      let lastT = 0, lastP = '';
+      $('#abPer').onclick = e => {
+        const b = e.target.closest('[data-p]'); if (!b) return;
+        e.preventDefault(); e.stopPropagation();
+        const t = Date.now(); if (b.dataset.p === lastP && t - lastT < 350) return;
+        lastT = t; lastP = b.dataset.p; SND('tap'); buzz(8);
+        picked.has(b.dataset.p) ? picked.delete(b.dataset.p) : picked.add(b.dataset.p);
+        b.blur(); paint(); $('#abErr').textContent = '';
+      };
+      $('#abKinds').onclick = e => {
+        const b = e.target.closest('[data-k]'); if (!b) return;
+        e.preventDefault(); SND('tap'); kind = b.dataset.k;
+        $('#abKinds').querySelectorAll('[data-k]').forEach(x => x.classList.toggle('on', x === b)); $('#abErr').textContent = '';
+      };
+      draw();
+    });
+    if (!v) return;
+    await S.add('msgs', { type: 'absreq', tid: ME, name: me.name, from: 'teacher', ...v, status: 'pending', at: now(), readA: false, readT: true });
+    SND('send'); buzz(20); toast('انرسل طلب تأمين حصصك للإدارة');
   });
   $('#reqList').addEventListener('click', async e => {
     const c = e.target.closest('[data-rq-cancel]'); if (!c) return;
