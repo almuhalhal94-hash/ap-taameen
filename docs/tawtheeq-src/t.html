@@ -1,0 +1,122 @@
+<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><style>
+@font-face{font-family:Readex;src:url(file:///home/user/ap-taameen/assets/fonts/readex-pro-arabic-400-normal.woff2);font-weight:400}
+@font-face{font-family:Readex;src:url(file:///home/user/ap-taameen/assets/fonts/readex-pro-arabic-600-normal.woff2);font-weight:600}
+@font-face{font-family:Readex;src:url(file:///home/user/ap-taameen/assets/fonts/readex-pro-arabic-700-normal.woff2);font-weight:700}
+@font-face{font-family:Readex;src:url(file:///home/user/ap-taameen/assets/fonts/readex-pro-latin-400-normal.woff2);font-weight:400;unicode-range:U+0000-00FF}
+@font-face{font-family:Readex;src:url(file:///home/user/ap-taameen/assets/fonts/readex-pro-latin-700-normal.woff2);font-weight:700;unicode-range:U+0000-00FF}
+@font-face{font-family:Amiri;src:url(file:///home/user/ap-taameen/assets/fonts/amiri-arabic-700-normal.woff2);font-weight:700}
+@page{size:A4;margin:0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Readex,sans-serif;color:#2b1a12;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:210mm;height:297mm;position:relative;overflow:hidden;background:#fffaf2;page-break-after:always;display:flex;flex-direction:column}
+.page:last-child{page-break-after:auto}
+.frame{position:absolute;inset:6mm;border:1.2px solid #c9a35a;border-radius:4mm;pointer-events:none}
+.frame:after{content:"";position:absolute;inset:1.6mm;border:.5px solid rgba(201,163,90,.55);border-radius:3mm}
+.band{background:linear-gradient(135deg,#4a0710,#7a1424 60%,#5a0b16);color:#fff;padding:11mm 14mm 9mm;display:flex;align-items:center;gap:6mm;position:relative}
+.band:after{content:"";position:absolute;left:0;right:0;bottom:0;height:1.6mm;background:linear-gradient(90deg,#b8862b,#f6d690,#b8862b)}
+.band img{width:21mm;height:21mm;border-radius:5mm;flex:none}
+.band .k{font-size:9.5pt;color:#f3e3d0;letter-spacing:.3px}
+.band h1{margin:1mm 0 1mm;font-family:Amiri;font-size:25pt;color:#f6d690;line-height:1.25}
+.band .s{font-size:10.5pt;color:#fff}
+.band .tag{margin-inline-start:auto;text-align:center;border:1px solid rgba(246,214,144,.6);border-radius:3mm;padding:2.5mm 4mm;font-size:9pt;color:#f6d690;line-height:1.5}
+.band .tag b{display:block;font-size:13pt;color:#fff}
+.body{padding:7mm 14mm 0;flex:1;display:flex;flex-direction:column}
+.info{display:grid;grid-template-columns:repeat(3,1fr);gap:2.5mm;margin-bottom:5mm}
+.info div{background:#fff;border:1px solid #ead9bd;border-radius:2.5mm;padding:2.4mm 3.2mm}
+.info small{display:block;color:#8a6a3a;font-size:8pt;font-weight:600}
+.info b{font-size:10pt;color:#3a0a12}
+h2{font-family:Amiri;color:#6b0f1a;font-size:15pt;margin:0 0 2mm;display:flex;align-items:center;gap:2.5mm}
+h2:before{content:"";width:2.4mm;height:6mm;border-radius:1mm;background:linear-gradient(#e2b45a,#b8862b)}
+p{margin:0 0 3.5mm;font-size:10.3pt;line-height:1.85;text-align:justify}
+.hero{height:100mm;border-radius:3.5mm;overflow:hidden;margin-bottom:5mm;position:relative}
+.hero img,.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.cap{position:absolute;bottom:0;right:0;left:0;padding:6mm 4mm 2.5mm;background:linear-gradient(transparent,rgba(30,4,8,.82));color:#fff;font-size:8.6pt}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:6mm}
+ul{margin:0 0 3mm;padding:0 4.5mm 0 0;font-size:10pt;line-height:1.8}
+li::marker{color:#b8862b}
+ol{margin:0;padding:0;list-style:none;counter-reset:a;font-size:10pt;line-height:1.55}
+ol li{counter-increment:a;display:flex;gap:2.5mm;align-items:flex-start;margin-bottom:2mm}
+ol li:before{content:counter(a);flex:none;width:5.6mm;height:5.6mm;border-radius:50%;background:#6b0f1a;color:#f6d690;font-size:8.5pt;font-weight:700;display:grid;place-items:center;margin-top:.4mm}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;grid-template-rows:48mm 48mm;gap:3mm;margin-bottom:5mm}
+.ph{border-radius:3mm;overflow:hidden;position:relative}
+.ph.big{grid-row:span 2}
+.wide{height:42mm;margin-bottom:5mm}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:2.5mm;margin-bottom:5mm}
+.stats div{background:linear-gradient(160deg,#5a0b16,#7a1424);color:#fff;border-radius:2.5mm;padding:2.8mm;text-align:center}
+.stats b{display:block;font-size:15pt;color:#f6d690}
+.stats small{font-size:8pt;color:#f3e3d0}
+.sign{margin-top:auto;margin-bottom:15mm;border-top:1.4px solid #b8862b;padding-top:3.5mm;display:grid;grid-template-columns:1fr 1.5fr 1fr;text-align:center;gap:3mm}
+.sign small{display:block;color:#8a6a3a;font-size:8.5pt;font-weight:600;margin-bottom:1mm}
+.sign b{font-family:Amiri;font-size:13.5pt;color:#3a0a12;line-height:1.45}
+.pn{position:absolute;bottom:7.6mm;left:0;right:0;text-align:center;font-size:7.5pt;color:#a08560}
+</style></head><body>
+
+<section class="page"><div class="frame"></div>
+<div class="band"><img src="file:///home/user/ap-taameen/app/icon-192.png"><div><div class="k">مدرسة ابن رشد الإعدادية للبنين</div><h1>توثيق تدشين تطبيق التأمين والتبديل</h1><div class="s">لقاء تعريفي بالهيئة التعليمية لإطلاق التطبيق الرقمي</div></div>
+<div class="tag">العام الدراسي<b dir="ltr" style="white-space:nowrap">2026 / 2027</b></div></div>
+<div class="body">
+<div class="info">
+<div><small>اليوم والتاريخ</small><b>الخميس 12 نوفمبر 2026م</b></div>
+<div><small>المكان</small><b>الصالة الرياضية بالمدرسة</b></div>
+<div><small>الفئة المستهدفة</small><b>الهيئة التعليمية والإدارية</b></div>
+<div><small>الإعداد والتقديم</small><b>أ. طلال سعود</b></div>
+<div><small>أسلوب التنفيذ</small><b>عرض تقديمي، فيديو شرح، تطبيق مباشر</b></div>
+<div><small>موعد التشغيل الفعلي</small><b>الأحد 15 نوفمبر 2026م</b></div>
+</div>
+<div class="hero"><img src="p2.jpg"><div class="cap">جانب من حضور الهيئة التعليمية أثناء استعراض التطبيق على شاشة العرض</div></div>
+<h2>نبذة عن التدشين</h2>
+<p>في إطار التحوّل الرقمي وتنظيم العمل المدرسي، دشّنت مدرسة ابن رشد الإعدادية للبنين <b>تطبيق التأمين والتبديل</b>، وهو تطبيق رقمي يُعنى بتوزيع حصص التأمين ومراقبة الفسحة بعدالة وفق ضوابط معتمدة، وتنظيم طلبات تبديل الحصص وطلبات تأمين الحصص عند الغياب بعذر رسمي، مع إيصال التكليف إلى جوال المعلم مباشرة ومتابعة استلامه لحظيًا. وقد قدّم اللقاءَ <b>أ. طلال سعود</b> معدُّ التطبيق، بحضور إدارة المدرسة والهيئة التعليمية.</p>
+<div class="cols">
+<div><h2>أهداف التدشين</h2><ul>
+<li>تعريف المعلمين بالتطبيق وآلية الدخول برمز خاص لكل معلم.</li>
+<li>تحقيق العدالة والشفافية في توزيع التأمين والمراقبة.</li>
+<li>تقليل الأعباء الورقية وتسريع وصول التكليف للمعلم.</li>
+<li>توثيق الاستلام والاعتذار والطلبات بشكل منظّم.</li>
+</ul></div>
+<div><h2>ضوابط التوزيع المعتمدة</h2><ul>
+<li>قسم الغائب أولًا، ثم الأقل تأمينًا والأخف نصابًا.</li>
+<li>تأمين واحد يوميًا، والثاني للضرورة فقط.</li>
+<li>المنسقون وأصحاب النصاب العالي للضرورة.</li>
+<li>المشرفون في صفوف إشرافهم، ومراعاة الظروف الخاصة.</li>
+</ul></div>
+</div>
+</div>
+<div class="pn">١ / ٢</div>
+</section>
+
+<section class="page"><div class="frame"></div>
+<div class="body" style="padding-top:13mm">
+<h2>محاور العرض</h2>
+<div class="cols" style="margin-bottom:4mm">
+<ol>
+<li><span><b>فيديو تعريفي</b> بطريقة استخدام التطبيق خطوة بخطوة.</span></li>
+<li><span><b>تثبيت التطبيق</b> على الجوال عبر الباركود، والدخول بالرمز الخاص.</span></li>
+<li><span><b>استلام التكليف</b> أو الاعتذار بعذر رسمي، وإمكانية التراجع.</span></li>
+</ol>
+<ol style="counter-reset:a 3">
+<li><span><b>طلب تبديل حصة</b> مع زميل يدرّس الصف نفسه.</span></li>
+<li><span><b>طلب تأمين حصص</b> للغياب بعذر رسمي قبل موعده بيوم أو أكثر.</span></li>
+<li><span><b>شاشة المشرف</b> لمتابعة صفوف الإشراف، والمحادثة مع الإدارة.</span></li>
+</ol>
+</div>
+<div class="grid">
+<div class="ph big"><img src="p3.jpg"><div class="cap">استعراض خطوات الدخول بالرمز الخاص</div></div>
+<div class="ph"><img src="p5.jpg"><div class="cap">استعراض نماذج الطلبات في التطبيق</div></div>
+<div class="ph"><img src="p1.jpg" style="object-position:50% 35%"><div class="cap">التجهيز لعرض فيديو الشرح</div></div>
+</div>
+<div class="ph wide"><img src="p4.jpg" style="object-position:50% 45%"><div class="cap">تفاعل الحضور مع العرض المباشر للتطبيق</div></div>
+<h2>المخرجات</h2>
+<ul>
+<li>اطّلاع الهيئة التعليمية على التطبيق وآلية عمله، والإجابة عن استفساراتهم.</li>
+<li>تزويد المعلمين برابط التطبيق ودليل الاستخدام، وتوزيع رموز الدخول عبر منسقي الأقسام.</li>
+<li>بدء التشغيل الفعلي للتطبيق يوم الأحد 15 نوفمبر 2026م.</li>
+</ul>
+<div class="sign">
+<div><small>إعداد</small><b>أ. طلال سعود</b></div>
+<div><small>المديران المساعدان</small><b>أ. أنور الجابري — أ. أحمد بوجيري</b></div>
+<div><small>مدير المدرسة</small><b>أ. خالد السيد</b></div>
+</div>
+</div>
+<div class="pn">٢ / ٢</div>
+</section>
+</body></html>
