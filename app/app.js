@@ -635,7 +635,12 @@
     let p; try { p = await S.get('people/' + k); } catch (e) { return; }
     if (p && p.revoked) { store.del('apt-key'); toast('تجدّد رمز الدخول — ادخل برمزك الجديد'); setTimeout(() => location.reload(), 1500); }
   };
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) recheck(); });
+  // تحديث تلقائي: لو نزلت نسخة جديدة من التطبيق، يحدّث نفسه أول ما يرجع له المعلم
+  const verOf = async () => { try { const r = await Promise.all(['app.js', 'index.html', 'app.css'].map(f => fetch(f + '?v=' + Date.now(), { cache: 'no-store' }).then(x => x.text()))); return r.map(t => t.length).join('-'); } catch (e) { return ''; } };
+  let VER = ''; verOf().then(v => { VER = v; });
+  const checkVer = async () => { const v = await verOf(); if (VER && v && v !== VER) { toast('تحديث جديد للتطبيق…'); setTimeout(() => location.reload(), 900); } };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { recheck(); checkVer(); } });
+  setInterval(checkVer, 10 * 60 * 1000);
   setInterval(recheck, 5 * 60 * 1000);
   show(TEACH ? 'tasks' : 'sup');
   setTimeout(() => { firstLoad = false; }, 1500);
