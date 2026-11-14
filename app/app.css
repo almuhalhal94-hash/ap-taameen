@@ -272,3 +272,8 @@ button,a,[data-p]{touch-action:manipulation}
 .ab-kinds button.on{background:rgba(226,180,90,.16);border-color:#e2b45a;color:#f6d690;font-weight:700}
 .ab-pledge{display:flex;gap:8px;align-items:flex-start;margin:12px 0 2px;font-size:.85rem;line-height:1.6;cursor:pointer}
 .ab-pledge input{width:18px;height:18px;margin-top:3px;accent-color:#e2b45a;flex:none}
+/* صندوق تفعيل الإشعارات */
+.push-box{margin:12px 0 4px;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(226,180,90,.16),rgba(226,180,90,.06));border:1.5px solid rgba(226,180,90,.55);display:flex;flex-direction:column;gap:6px}
+.push-box b{color:#f6d690;font-size:1rem}.push-box small{color:var(--muted);line-height:1.7;font-size:.82rem}
+.push-box button{margin-top:4px;padding:12px;border:0;border-radius:12px;background:linear-gradient(135deg,#f9e2a8,#e2b45a);color:#2b0408;font:inherit;font-weight:800;font-size:.95rem;cursor:pointer}
+.push-box button:disabled{opacity:.6}

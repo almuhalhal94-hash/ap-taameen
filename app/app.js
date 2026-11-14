@@ -570,6 +570,46 @@
     await S.set('msgs/' + c.dataset.rqCancel, { status: 'cancelled' }); toast('أُلغي الطلب');
   });
 
+  // ---------- الإشعارات (Push): تفعيل مرة وحدة، وتوصل والتطبيق مسكّر ----------
+  const FBV = '10.12.2', FBB = `https://www.gstatic.com/firebasejs/${FBV}/`;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const pushOK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && S.mode !== 'demo' && location.protocol === 'https:';
+  async function pushToken() {
+    const [{ getApp }, M] = await Promise.all([import(FBB + 'firebase-app.js'), import(FBB + 'firebase-messaging.js')]);
+    if (!(await M.isSupported())) throw new Error('unsupported');
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    return M.getToken(M.getMessaging(getApp()), { serviceWorkerRegistration: reg });
+  }
+  async function savePush() {
+    const key = store.get('apt-key'), t = await pushToken();
+    if (!t || !key) throw new Error('no token');
+    await S.set('people/' + key, { pushTokens: { [t.slice(-24).replace(/[^A-Za-z0-9_-]/g, '_')]: t }, pushAt: now() });
+    store.set('apt-push-for', key);
+  }
+  function renderPush() {
+    const box = $('#pushBox'); if (!box) return;
+    const on = 'Notification' in window && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key');
+    if (on || S.mode === 'demo') { box.hidden = true; return; }
+    box.hidden = false;
+    if (isIOS && !standalone) { box.innerHTML = `<b>🔔 الإشعارات على الآيفون</b><small>ثبّت التطبيق أول: من سفاري اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية»، وافتحه من الأيقونة، وبيطلع لك زر التفعيل هنا.</small>`; return; }
+    if (!pushOK) { box.hidden = true; return; }
+    if (Notification.permission === 'denied') { box.innerHTML = `<b>🔕 الإشعارات مقفلة</b><small>فعّلها من إعدادات الجوال للتطبيق أو المتصفح، ثم ارجع هنا.</small>`; return; }
+    box.innerHTML = `<b>🔔 فعّل الإشعارات</b><small>يوصلك تنبيه على الجوال بأي تكليف أو تبديل أو رسالة من الإدارة، حتى والتطبيق مسكّر.</small><button type="button" id="btnPush">تفعيل الإشعارات</button>`;
+    $('#btnPush').onclick = async () => {
+      SND('tap'); const b = $('#btnPush'); b.disabled = true; b.textContent = 'جاري التفعيل…';
+      try {
+        const p = await Notification.requestPermission();
+        if (p !== 'granted') { toast('ما تفعّلت — لازم توافق على الإشعارات'); renderPush(); return; }
+        await savePush(); toast('✓ تفعّلت الإشعارات'); SND('send'); renderPush();
+      } catch (e) { console.warn(e); toast('تعذّر التفعيل — جرّب مرة ثانية'); b.disabled = false; b.textContent = 'تفعيل الإشعارات'; }
+    };
+  }
+  renderPush();
+  // لو سبق ووافق (أو تغيّر رمزه بعد التجديد) يتسجّل جهازه بصمت
+  if (pushOK && Notification.permission === 'granted' && store.get('apt-push-for') !== store.get('apt-key')) savePush().then(renderPush).catch(e => console.warn('push', e));
+
   // الرمز الملغى (بعد تجديد الرموز) يطلّع المعلم لشاشة الدخول حتى لو التطبيق مفتوح — وانقطاع النت ما يطلّعه
   const recheck = async () => {
     const k = store.get('apt-key'); if (!k) return;
