@@ -1,0 +1,24 @@
+name: حارس إشعارات المعلمين
+# يراقب السحابة لحظيًا ويرسل إشعار لكل معلم (تأمين، تبديل، تحديث، إلغاء، تذكير، رسائل الإدارة)
+# من 5:30 الصبح لين 9 الليل بتوقيت البحرين، السبت إلى الخميس. الكود في فرع العمل: tools/push
+on:
+  schedule:
+    - cron: '30 2 * * 0-4,6'        # 5:30 الصبح — بداية الدوام
+    - cron: '*/20 3-17 * * 0-4,6'   # احتياط: يرجّع الحارس لو توقف
+  workflow_dispatch:
+concurrency: { group: push-guard, cancel-in-progress: false }
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/beautiful-planck-y0yu0f
+          sparse-checkout: tools/push
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm i --no-save firebase-admin@12
+      - run: node tools/push/guard.mjs
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
