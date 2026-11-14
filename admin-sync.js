@@ -529,13 +529,15 @@
   });
 
   // ---------------- ملخص اليوم لقروب الواتساب ----------------
-  $('#btnGroup').addEventListener('click', async () => {
+  const copyGroup = async () => {
     const t = A.groupText();
     if (!t) return A.toast('ما فيه تأمين أو تبديل في هذا اليوم');
     try { await navigator.clipboard.writeText(t); A.toast('انسخ ✓ — الصقه في قروب المعلمين'); }
     catch (e) { prompt('انسخ الملخص:', t); }
     if (!sentDays()[A.date]) A.toast('تنبيه: هذا اليوم ما انرسل للتطبيق للحين — اضغط «إرسال للمعلمين» عشان يقدرون يستلمون');
-  });
+  };
+  $('#btnGroup').addEventListener('click', copyGroup);
+  document.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', copyGroup));
 
   // ---------------- تنبيهات واضحة: اعتذار، طلب رجوع، تراجع ----------------
   const ALERT = { rejected: ['⚠', 'اعتذار من'], withdrew: ['⚠', 'اعتذار بعد الاستلام من'], askback: ['⭐', 'طلب رجوع للتكليف من'], returned: ['✓', 'تراجع عن اعتذاره وسيحضر:'] };
