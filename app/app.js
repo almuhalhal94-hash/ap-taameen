@@ -583,7 +583,8 @@
     return M.getToken(M.getMessaging(getApp()), { serviceWorkerRegistration: reg });
   }
   async function savePush() {
-    const key = store.get('apt-key'), t = await pushToken();
+    const key = store.get('apt-key');
+    let t; try { t = await pushToken(); } catch (e) { await new Promise(r => setTimeout(r, 1500)); t = await pushToken(); }
     if (!t || !key) throw new Error('no token');
     await S.set('people/' + key, { pushTokens: { [t.slice(-24).replace(/[^A-Za-z0-9_-]/g, '_')]: t }, pushAt: now() });
     store.set('apt-push-for', key);
@@ -591,7 +592,14 @@
   function renderPush() {
     const box = $('#pushBox'); if (!box) return;
     const on = 'Notification' in window && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key');
-    if (on || S.mode === 'demo') { box.hidden = true; return; }
+    if (S.mode === 'demo') { box.hidden = true; return; }
+    if (on) {
+      box.hidden = false; box.classList.add('ok');
+      box.innerHTML = `<b>🔔 الإشعارات مفعّلة على هذا الجهاز</b><button type="button" id="btnPushTest" class="sec">إرسال إشعار تجريبي</button>`;
+      $('#btnPushTest').onclick = async () => { SND('tap'); await S.set('people/' + store.get('apt-key'), { pushTest: now() }); toast('انرسل — سكّر التطبيق، ويوصلك خلال ثواني'); };
+      return;
+    }
+    box.classList.remove('ok');
     box.hidden = false;
     if (isIOS && !standalone) { box.innerHTML = `<b>🔔 الإشعارات على الآيفون</b><small>ثبّت التطبيق أول: من سفاري اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية»، وافتحه من الأيقونة، وبيطلع لك زر التفعيل هنا.</small>`; return; }
     if (!pushOK) { box.hidden = true; return; }
@@ -603,7 +611,12 @@
         const p = await Notification.requestPermission();
         if (p !== 'granted') { toast('ما تفعّلت — لازم توافق على الإشعارات'); renderPush(); return; }
         await savePush(); toast('✓ تفعّلت الإشعارات'); SND('send'); renderPush();
-      } catch (e) { console.warn(e); toast('تعذّر التفعيل — جرّب مرة ثانية'); b.disabled = false; b.textContent = 'تفعيل الإشعارات'; }
+      } catch (e) {
+        console.warn(e); const msg = String((e && (e.code || e.name)) || '') + ' ' + String((e && e.message) || e).slice(0, 160);
+        S.set('people/' + store.get('apt-key'), { pushErr: msg, pushErrAt: now(), ua: navigator.userAgent.slice(0, 160) }).catch(() => { });
+        toast('تعذّر التفعيل'); b.disabled = false; b.textContent = 'إعادة المحاولة';
+        const er = $('#pushErr') || box.appendChild(Object.assign(document.createElement('small'), { id: 'pushErr' })); er.textContent = 'السبب: ' + msg;
+      }
     };
   }
   renderPush();

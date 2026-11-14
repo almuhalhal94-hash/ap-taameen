@@ -14,9 +14,16 @@ const state = new Map(), done = new Set();
 for (const d of (await db.collection('pushlog').get()).docs) { if (d.id.startsWith('A_')) state.set(d.id.slice(2), d.data()); else done.add(d.id); }
 log('pushlog loaded:', state.size, 'assign states,', done.size, 'messages');
 
+// طابور واحد عشان الترتيب وعدم التكرار
+let q = Promise.resolve();
+const run = fn => (q = q.then(fn).catch(e => log('err', e.message)));
 // أجهزة المعلمين لحظيًا (من الرموز الفعّالة فقط)
-let devices = {}, owner = {};
+let devices = {}, owner = {}, firstPeople = true;
+const testSeen = new Map();
 db.collection('people').onSnapshot(s => {
+  // زر «إرسال إشعار تجريبي» في تطبيق المعلم
+  s.docs.forEach(d => { const p = d.data(), t = p.pushTest || 0; if (!firstPeople && t > (testSeen.get(d.id) || 0) && !p.revoked && p.pushTokens) run(() => pushTo(Object.values(p.pushTokens), { tid: p.tid, title: '✓ الإشعارات شغالة', body: 'هذا إشعار تجريبي — بيوصلك كذا أي تكليف أو تبديل', tag: 'test' })); if (p.pushErr && (p.pushErrAt || 0) > START - 864e5 && !testSeen.has('e' + d.id)) { testSeen.set('e' + d.id, 1); log('pushErr', p.tid, p.pushErr, '|', (p.ua || '').slice(0, 90)); } testSeen.set(d.id, t); });
+  firstPeople = false;
   const dv = {}, ow = {};
   s.docs.forEach(d => { const p = d.data(); if (p.revoked || !p.tid || !p.pushTokens) return; for (const [k, t] of Object.entries(p.pushTokens)) { (dv[p.tid] = dv[p.tid] || new Set()).add(t); ow[t] = { doc: d.id, k }; } });
   devices = dv; owner = ow;
@@ -24,8 +31,8 @@ db.collection('people').onSnapshot(s => {
 }, e => { log('people listener error', e.code); process.exit(1); });
 
 let sentCount = 0;
-async function push(n) {
-  const ts = [...(devices[n.tid] || [])];
+async function push(n) { return pushTo([...(devices[n.tid] || [])], n); }
+async function pushTo(ts, n) {
   if (!ts.length) { log('no device for', n.tid, '|', n.title); return; }
   const r = await fcm.sendEachForMulticast({ tokens: ts, webpush: { headers: { Urgency: 'high', TTL: '43200' }, data: { title: n.title, body: n.body, tag: n.tag || '', url: './' } } });
   r.responses.forEach((x, i) => {
@@ -36,9 +43,6 @@ async function push(n) {
   });
   sentCount += r.successCount; log('→', n.tid, n.title, `(${r.successCount}/${ts.length})`);
 }
-// طابور واحد عشان الترتيب وعدم التكرار
-let q = Promise.resolve();
-const run = fn => (q = q.then(fn).catch(e => log('err', e.message)));
 
 const listen = () => db.collection('assign').where('date', '>=', today()).onSnapshot(s => {
   const ch = s.docChanges().filter(c => c.type !== 'removed');
