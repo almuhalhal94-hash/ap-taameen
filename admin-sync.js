@@ -66,13 +66,15 @@
       if (cur.to && cur.to !== w.to && cur.status !== 'cancelled') n.log = [...(cur.log || []), { tid: cur.to, name: cur.toName, act: 'reassigned', at: now() }];
       Object.assign(n, { to: w.to, toName: w.to ? tName(w.to) : '', emg: w.emg, status: statusFor(w.to), auto: false });
     }
+    // «إعادة الإرسال» يذكّر اللي ما استلم بعد (الحارس يرسل له تذكير)
+    if (NUDGE && cur.status === 'pending' && n.status === 'pending' && n.to) n.nudgeAt = now();
     const strip = x => { const { updatedAt, ...r } = x; return JSON.stringify(r); };
     if (strip(n) === strip(cur)) return null;
     n.updatedAt = now();
     return n;
   }
 
-  let busy = false, again = false;
+  let busy = false, again = false, NUDGE = false;
   const sentDays = () => (A.settings.sentDays = A.settings.sentDays || {});
   async function publish(manual) {
     if (busy) { again = true; return; }
@@ -80,12 +82,14 @@
     try {
       const iso = A.date, want = desired(), ids = new Set(want.map(w => w.id));
       if (manual && !want.length) { A.toast('ما فيه تأمين أو تبديل لهذا اليوم'); return; }
+      NUDGE = !!manual && !!sentDays()[iso];
       for (const w of want) await S.tx('assign/' + w.id, cur => merged(cur, w));
+      NUDGE = false;
       for (const d of docs) if (d.date === iso && !ids.has(d.id) && d.status !== 'cancelled') await S.set('assign/' + d.id, { status: 'cancelled', updatedAt: now() });
       if (!sentDays()[iso]) { sentDays()[iso] = true; A.saveSettings(); }
       if (manual) A.toast(`✓ تم الإرسال لـ ${new Set(want.map(w => w.to).filter(Boolean)).size} معلم — يطلع لهم في التطبيق الحين`);
     } catch (e) { console.warn(e); A.toast('تعذّر الإرسال — تأكد من الاتصال'); }
-    finally { busy = false; if (again) { again = false; publish(false); } }
+    finally { busy = false; NUDGE = false; if (again) { again = false; publish(false); } }
     renderSend();
   }
   $('#btnSend').addEventListener('click', () => publish(true));
