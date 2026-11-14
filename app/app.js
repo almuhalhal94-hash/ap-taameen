@@ -602,7 +602,11 @@
     box.classList.remove('ok');
     box.hidden = false;
     if (isIOS && !standalone) { box.innerHTML = `<b>🔔 الإشعارات على الآيفون</b><small>ثبّت التطبيق أول: من سفاري اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية»، وافتحه من الأيقونة، وبيطلع لك زر التفعيل هنا.</small>`; return; }
-    if (!pushOK) { box.hidden = true; return; }
+    if (!pushOK) {
+      const iv = (navigator.userAgent.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.');
+      box.innerHTML = `<b>🔕 جهازك ما يدعم الإشعارات</b><small>${isIOS ? `الآيفون يحتاج نظام iOS 16.4 أو أحدث${iv ? ' (جهازك: iOS ' + iv + ')' : ''}، والتطبيق مفتوح من الأيقونة على الشاشة الرئيسية. حدّث النظام من الإعدادات ← عام ← تحديث البرنامج.` : 'افتح التطبيق من متصفح Chrome أو من الأيقونة على الشاشة الرئيسية.'}</small>`;
+      return;
+    }
     if (Notification.permission === 'denied') { box.innerHTML = `<b>🔕 الإشعارات مقفلة</b><small>فعّلها من إعدادات الجوال للتطبيق أو المتصفح، ثم ارجع هنا.</small>`; return; }
     box.innerHTML = `<b>🔔 فعّل الإشعارات</b><small>يوصلك تنبيه على الجوال بأي تكليف أو تبديل أو رسالة من الإدارة، حتى والتطبيق مسكّر.</small><button type="button" id="btnPush">تفعيل الإشعارات</button>`;
     $('#btnPush').onclick = async () => {
@@ -620,6 +624,8 @@
     };
   }
   renderPush();
+  if (S.mode !== 'demo' && !(('Notification' in window) && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key')))
+    S.add('msgs', { type: 'diag', tid: ME, at: now(), ua: navigator.userAgent.slice(0, 200), standalone, sw: 'serviceWorker' in navigator, pm: 'PushManager' in window, nt: 'Notification' in window, perm: 'Notification' in window ? Notification.permission : 'none', pushFor: store.get('apt-push-for') === store.get('apt-key') }).catch(() => { });
   // لو سبق ووافق (أو تغيّر رمزه بعد التجديد) يتسجّل جهازه بصمت
   if (pushOK && Notification.permission === 'granted' && store.get('apt-push-for') !== store.get('apt-key')) savePush().then(renderPush).catch(e => console.warn('push', e));
 
