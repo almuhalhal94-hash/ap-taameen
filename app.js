@@ -1144,6 +1144,20 @@
       const rows = state.rows.filter(r => r.absent === a);
       return { n: rows.length, covered: rows.filter(r => r.sub).length };
     },
+    // ملخص اليوم لقروب الواتساب: الأسماء بالحصص بدون أسماء الغائبين
+    groupText() {
+      if (D() === -1) return '';
+      const short = n => n.replace(/^أ\.\s*/, '');
+      const lines = [];
+      [...state.rows].filter(r => r.sub).sort((a, b) => slotIdx(a.slot) - slotIdx(b.slot)).forEach(r => {
+        const sp = slotPlain(r.slot, r.c);
+        lines.push(BREAKS.has(r.slot) ? `☕ ${sp.name}${r.c ? ' (' + r.c + ')' : ''}: أ. ${short(nm(r.sub))}` : `▫️ الحصة ${sp.name} (${r.c}): أ. ${short(nm(r.sub))}`);
+      });
+      const sw = [];
+      state.swaps.forEach(x => x.items.filter(it => it.b && it.s2).forEach(it => sw.push(`⇄ ${SLOT_NAME[it.s]} (${it.c}): أ. ${short(nm(it.b))}، ويدخل أ. ${short(nm(x.a))} حصته ${SLOT_NAME[it.s2]}`)));
+      if (!lines.length && !sw.length) return '';
+      return `🛡️ التأمين والتبديل — ${weekdayName(date)} ${fmtG(date)}\n\n` + (lines.length ? lines.join('\n') : '') + (sw.length ? (lines.length ? '\n\n' : '') + 'التبديل:\n' + sw.join('\n') : '') + `\n\n📲 فضلًا افتح التطبيق واضغط «استلمت التكليف»:\nhttps://ap-taameen.web.app/app/`;
+    },
     openSwap() { document.querySelector('.tab[data-tab="swaps"]').click(); },
     swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },
     // يطبّق رد معلم: اعتذار (يضاف للمعتذرين) والبديل الجديد اللي اختاره التطبيق

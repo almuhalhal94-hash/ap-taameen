@@ -554,3 +554,5 @@ h2{font-size:1.45rem}
 .lk-dh b{font-size:1.05em;color:#f6d690}.lk-dh .muted{color:#f3e3d0;flex:1}
 .lk-dept .lk{margin:0;border-radius:0;border-width:0 0 1px}
 .lk-dh .btn{background:#f6d690;color:#4a0a12;border-color:#f6d690;font-weight:700}
+.btn.wa{background:#1f8f4e;color:#fff;border-color:#1f8f4e;font-weight:700}
+.btn.wa:hover{background:#18763f}
