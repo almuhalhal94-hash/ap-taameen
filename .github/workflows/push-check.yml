@@ -1,0 +1,17 @@
+name: فحص صلاحيات الإشعارات
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/beautiful-planck-y0yu0f]
+    paths: [tools/push/check.mjs]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm i --no-save firebase-admin@12
+      - run: node tools/push/check.mjs
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
