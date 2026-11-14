@@ -408,6 +408,8 @@
     SND('send'); toast('انرسل ردك للمدير المساعد');
   });
 
+  const PER = { 1: 'الأولى', 2: 'الثانية', 3: 'الثالثة', 4: 'الرابعة', 5: 'الخامسة', 6: 'السادسة', 7: 'السابعة' };
+  const perName = s => PER[s] || s;
   // ---------- المحادثة ----------
   S.watch('msgs', ['tid', '==', ME], all => {
     const list = all.filter(m => !m.type);
@@ -446,8 +448,6 @@
         <div class="side"><span class="tag ${st[0] === 'ok' ? 'ok' : ''}">${st[1]}</span>${q.status === 'pending' ? `<button class="mini" data-rq-cancel="${q.id}">إلغاء الطلب</button>` : ''}</div></div>`;
     }).join('');
   }
-  const PER = { 1: 'الأولى', 2: 'الثانية', 3: 'الثالثة', 4: 'الرابعة', 5: 'الخامسة', 6: 'السادسة', 7: 'السابعة' };
-  const perName = s => PER[s] || s;
   $('#btnReq').addEventListener('click', async () => {
     SND('tap');
     const tm = new Date(); tm.setDate(tm.getDate() + 1);
@@ -570,6 +570,14 @@
     await S.set('msgs/' + c.dataset.rqCancel, { status: 'cancelled' }); toast('أُلغي الطلب');
   });
 
+  // الرمز الملغى (بعد تجديد الرموز) يطلّع المعلم لشاشة الدخول حتى لو التطبيق مفتوح — وانقطاع النت ما يطلّعه
+  const recheck = async () => {
+    const k = store.get('apt-key'); if (!k) return;
+    let p; try { p = await S.get('people/' + k); } catch (e) { return; }
+    if (p && p.revoked) { store.del('apt-key'); toast('تجدّد رمز الدخول — ادخل برمزك الجديد'); setTimeout(() => location.reload(), 1500); }
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) recheck(); });
+  setInterval(recheck, 5 * 60 * 1000);
   show(TEACH ? 'tasks' : 'sup');
   setTimeout(() => { firstLoad = false; }, 1500);
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
