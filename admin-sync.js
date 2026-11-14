@@ -485,12 +485,14 @@
     const html = depts().map(d => {
       const ts = A.T.filter(t => t.dept === d && C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
       if (!ts.length) return '';
-      return `<section><h2>${e(d)} <small>${ts.length} معلم</small></h2>` + ts.map(t => {
+      const dAll = ts.map(t => msgFor(t)).join('\n\n━━━━━━━━━━━━\n\n');
+      return `<section><h2>${e(d)} <small>${ts.length} معلم</small><button type="button" class="dc" data-m="${e(dAll)}">نسخ رسائل القسم</button></h2>` + ts.map(t => {
         const m = msgFor(t);
         return `<article><div class="h"><b>${e(t.name)}</b><span class="c">${C[t.id]}</span></div><pre>${e(m.replace(/\*/g, ''))}</pre><div class="b"><a class="wa" href="https://wa.me/?text=${encodeURIComponent(m)}" target="_blank">إرسال بالواتساب</a><button type="button" data-m="${e(m)}">نسخ الرسالة</button></div></article>`;
       }).join('') + '</section>';
     }).join('');
     const today = A.fmtG(A.isoOf(new Date()));
+    const all = A.T.filter(t => C[t.id]).map(t => msgFor(t)).join('\n\n━━━━━━━━━━━━\n\n');
     return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>رسائل رموز دخول المعلمين</title><style>
 body{margin:0;background:#f7f1e8;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;color:#2b1a12}
 header{background:linear-gradient(135deg,#4a0710,#7a1424);color:#fff;padding:22px 18px 18px;border-bottom:4px solid #e2b45a}
@@ -506,12 +508,14 @@ article{background:#fff;border:1px solid #ead9bd;border-radius:14px;padding:12px
 pre{white-space:pre-wrap;unicode-bidi:plaintext;text-align:right;font-family:inherit;font-size:.85rem;line-height:1.7;background:#f9f6f1;border-radius:10px;padding:10px;margin:0 0 10px;color:#3a2a20}
 .b{display:flex;gap:8px}.b a,.b button{flex:1;text-align:center;padding:11px;border-radius:11px;font:inherit;font-weight:700;font-size:.92rem;text-decoration:none;cursor:pointer}
 .wa{background:#1f8f4e;color:#fff;border:0}.b button{background:#fff;color:#6b0f1a;border:1.5px solid #c9a35a}
+.all{display:block;width:100%;margin-top:10px;padding:12px;border-radius:12px;border:0;background:#6b0f1a;color:#f6d690;font:inherit;font-weight:800;font-size:1rem;cursor:pointer}
+h2{display:flex;align-items:center;gap:6px}.dc{margin-inline-start:auto;padding:6px 10px;border-radius:9px;border:1px solid #e2b45a;background:transparent;color:#f6d690;font:inherit;font-size:.78rem;font-weight:700;cursor:pointer}
 .done{opacity:.55}.done .h b:after{content:'  ✓ أُرسلت';color:#1f8f4e;font-size:.8rem}
 footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:1.9;border-top:1px solid #ead9bd}
 </style></head><body><header><h1>رسائل رموز دخول المعلمين</h1><p>تطبيق التأمين والتبديل — مدرسة ابن رشد الإعدادية للبنين · ${today}</p></header>
-<div class="how"><b>طريقة الإرسال:</b> لكل معلم رسالة مستقلة. اضغط <b>«إرسال بالواتساب»</b> واختر المعلم من جهات الاتصال، أو <b>«نسخ الرسالة»</b> والصقها في محادثته الخاصة. البطاقة تتعلّم «أُرسلت» بعد الضغط.<br><span class="warn">⚠️ هذه الصفحة فيها رموز كل المعلمين — لا تُرسل لأي قروب، واحذفها بعد الانتهاء.</span></div>
+<div class="how"><b>طريقة الإرسال:</b> لكل معلم رسالة مستقلة. اضغط <b>«إرسال بالواتساب»</b> واختر المعلم من جهات الاتصال، أو <b>«نسخ الرسالة»</b> والصقها في محادثته الخاصة. البطاقة تتعلّم «أُرسلت» بعد الضغط.<br><span class="warn">⚠️ هذه الصفحة فيها رموز كل المعلمين — لا تُرسل لأي قروب، واحذفها بعد الانتهاء.</span><button type="button" class="all" data-m="${e(all)}">📋 نسخ عام — كل الرسائل</button></div>
 <main>${html}</main><footer>إعداد: أ. طلال سعود | المديران المساعدان: أ. أنور الجابري، أ. أحمد بوجيري | مدير المدرسة: أ. خالد السيد</footer>
-<script>document.addEventListener('click',function(ev){var a=ev.target.closest('a.wa,button[data-m]');if(!a)return;var art=a.closest('article');if(a.dataset.m){ev.preventDefault();var t=a.dataset.m;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){a.textContent='✓ تم النسخ'},function(){var x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove();a.textContent='✓ تم النسخ'})}art.classList.add('done')});<\/script></body></html>`;
+<script>document.addEventListener('click',function(ev){var a=ev.target.closest('a.wa,button[data-m]');if(!a)return;var art=a.closest('article');var lab=a.textContent;if(a.dataset.m){ev.preventDefault();var t=a.dataset.m;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){a.textContent='✓ تم النسخ'},function(){var x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove();a.textContent='✓ تم النسخ'})}if(art)art.classList.add('done');else setTimeout(function(){a.textContent=lab},1800)});<\/script></body></html>`;
   }
 
   const DEPT_ORDER = ['التربية الإسلامية', 'اللغة العربية', 'اللغة الإنجليزية', 'الرياضيات', 'العلوم', 'المواد الاجتماعية', 'التصميم والتقانة', 'اللغة الفرنسية', 'التربية الرياضية'];
