@@ -475,9 +475,45 @@
   const isSup = id => A.supOf(id).length > 0;
   const newCode = used => { let c; do { c = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)); } while (used.has(c)); used.add(c); return c; };
   const msgFor = t => {
-    const c = codes()[t.id], sc = supCodes()[t.id];
-    return `السلام عليكم ${t.name}\nتطبيق التأمين والتبديل — مدرسة ابن رشد:\n${APP_URL}\nرمز دخولك: ${c}${isSup(t.id) ? '\n(نفس الرمز يفتح لك تكليفاتك ومتابعة صفوف إشرافك)' : ''}\nالرمز خاص بك، فضلًا لا تشاركه.`;
+    const c = codes()[t.id];
+    return `السلام عليكم ورحمة الله وبركاته\n${t.name} المحترم\n\n*تطبيق التأمين والتبديل*\nمدرسة ابن رشد الإعدادية للبنين\n\n🔗 رابط التطبيق:\n${APP_URL}\n\n🔑 رمز دخولك: *${c}*${isSup(t.id) ? '\n(نفس الرمز يفتح لك تكليفاتك ومتابعة صفوف إشرافك)' : ''}\n\n⚠️ الرمز خاص بك، فضلًا لا تشاركه مع أحد.\nشاكرين تعاونكم 🌷`;
   };
+  // صفحة واحدة فيها رسالة كل معلم مستقلة (مجمّعة حسب القسم) — يرسلها المدير واحدة واحدة
+  function msgPage() {
+    const C = codes();
+    const e = x => String(x).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]);
+    const html = depts().map(d => {
+      const ts = A.T.filter(t => t.dept === d && C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      if (!ts.length) return '';
+      return `<section><h2>${e(d)} <small>${ts.length} معلم</small></h2>` + ts.map(t => {
+        const m = msgFor(t);
+        return `<article><div class="h"><b>${e(t.name)}</b><span class="c">${C[t.id]}</span></div><pre>${e(m.replace(/\*/g, ''))}</pre><div class="b"><a class="wa" href="https://wa.me/?text=${encodeURIComponent(m)}" target="_blank">إرسال بالواتساب</a><button type="button" data-m="${e(m)}">نسخ الرسالة</button></div></article>`;
+      }).join('') + '</section>';
+    }).join('');
+    const today = A.fmtG(A.isoOf(new Date()));
+    return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>رسائل رموز دخول المعلمين</title><style>
+body{margin:0;background:#f7f1e8;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;color:#2b1a12}
+header{background:linear-gradient(135deg,#4a0710,#7a1424);color:#fff;padding:22px 18px 18px;border-bottom:4px solid #e2b45a}
+header h1{margin:0 0 4px;font-size:1.35rem;color:#f6d690}header p{margin:0;font-size:.9rem;color:#f3e3d0}
+.how{margin:14px;padding:12px 14px;background:#fff;border:1px solid #ead9bd;border-radius:14px;font-size:.9rem;line-height:1.8}
+.how b{color:#6b0f1a}.warn{color:#9b1c1c;font-weight:700}
+main{padding:0 14px 20px;max-width:760px;margin:auto}
+h2{margin:22px 0 10px;padding:9px 14px;border-radius:12px;background:#6b0f1a;color:#f6d690;font-size:1.05rem;position:sticky;top:0;z-index:2}
+h2 small{color:#f3e3d0;font-weight:400;font-size:.8rem;margin-inline-start:6px}
+article{background:#fff;border:1px solid #ead9bd;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.h{display:flex;align-items:center;gap:10px;margin-bottom:6px}.h b{flex:1;font-size:1.02rem}
+.c{direction:ltr;font-weight:800;letter-spacing:2px;background:#f6ecd8;border-radius:8px;padding:3px 10px;color:#4a0a12}
+pre{white-space:pre-wrap;unicode-bidi:plaintext;text-align:right;font-family:inherit;font-size:.85rem;line-height:1.7;background:#f9f6f1;border-radius:10px;padding:10px;margin:0 0 10px;color:#3a2a20}
+.b{display:flex;gap:8px}.b a,.b button{flex:1;text-align:center;padding:11px;border-radius:11px;font:inherit;font-weight:700;font-size:.92rem;text-decoration:none;cursor:pointer}
+.wa{background:#1f8f4e;color:#fff;border:0}.b button{background:#fff;color:#6b0f1a;border:1.5px solid #c9a35a}
+.done{opacity:.55}.done .h b:after{content:'  ✓ أُرسلت';color:#1f8f4e;font-size:.8rem}
+footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:1.9;border-top:1px solid #ead9bd}
+</style></head><body><header><h1>رسائل رموز دخول المعلمين</h1><p>تطبيق التأمين والتبديل — مدرسة ابن رشد الإعدادية للبنين · ${today}</p></header>
+<div class="how"><b>طريقة الإرسال:</b> لكل معلم رسالة مستقلة. اضغط <b>«إرسال بالواتساب»</b> واختر المعلم من جهات الاتصال، أو <b>«نسخ الرسالة»</b> والصقها في محادثته الخاصة. البطاقة تتعلّم «أُرسلت» بعد الضغط.<br><span class="warn">⚠️ هذه الصفحة فيها رموز كل المعلمين — لا تُرسل لأي قروب، واحذفها بعد الانتهاء.</span></div>
+<main>${html}</main><footer>إعداد: أ. طلال سعود | المديران المساعدان: أ. أنور الجابري، أ. أحمد بوجيري | مدير المدرسة: أ. خالد السيد</footer>
+<script>document.addEventListener('click',function(ev){var a=ev.target.closest('a.wa,button[data-m]');if(!a)return;var art=a.closest('article');if(a.dataset.m){ev.preventDefault();var t=a.dataset.m;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){a.textContent='✓ تم النسخ'},function(){var x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove();a.textContent='✓ تم النسخ'})}art.classList.add('done')});<\/script></body></html>`;
+  }
+
   const DEPT_ORDER = ['التربية الإسلامية', 'اللغة العربية', 'اللغة الإنجليزية', 'الرياضيات', 'العلوم', 'المواد الاجتماعية', 'التصميم والتقانة', 'اللغة الفرنسية', 'التربية الرياضية'];
   const depts = () => { const ds = [...new Set(A.T.map(t => t.dept))]; return ds.sort((a, b) => (DEPT_ORDER.indexOf(a) + 1 || 99) - (DEPT_ORDER.indexOf(b) + 1 || 99)); };
   const deptMsg = d => {
@@ -521,6 +557,14 @@
   }
   $('#btnLinks').addEventListener('click', () => makeCodes(false));
   $('#btnRenew').addEventListener('click', () => makeCodes(true));
+  $('#btnMsgPage').addEventListener('click', () => {
+    if (!Object.keys(codes()).length) return A.toast('جهّز الرموز أول');
+    const blob = new Blob([msgPage()], { type: 'text/html;charset=utf-8' });
+    const u = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = u; a.download = 'taameen-codes.html'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 4000);
+    A.toast('تنزّلت الصفحة — أرسلها للمدير بالخاص');
+  });
   const copy = async txt => { try { await navigator.clipboard.writeText(txt); A.toast('تم النسخ'); } catch (e) { prompt('انسخ:', txt); } };
   $('#linkList').addEventListener('click', e => { const d = e.target.closest('[data-copyd]'); if (d) return copy(deptMsg(d.dataset.copyd)); const b = e.target.closest('[data-copy]'); if (b) copy(msgFor(A.byId[b.dataset.copy])); });
   $('#btnCopyAll').addEventListener('click', () => {
