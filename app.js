@@ -1147,16 +1147,20 @@
     // ملخص اليوم لقروب الواتساب: الأسماء بالحصص بدون أسماء الغائبين
     groupText() {
       if (D() === -1) return '';
-      const short = n => n.replace(/^أ\.\s*/, '');
-      const lines = [];
-      [...state.rows].filter(r => r.sub).sort((a, b) => slotIdx(a.slot) - slotIdx(b.slot)).forEach(r => {
-        const sp = slotPlain(r.slot, r.c);
-        lines.push(BREAKS.has(r.slot) ? `☕ ${sp.name}${r.c ? ' (' + r.c + ')' : ''}: أ. ${short(nm(r.sub))}` : `▫️ الحصة ${sp.name} (${r.c}): أ. ${short(nm(r.sub))}`);
-      });
+      const nmS = id => 'أ. ' + nm(id).replace(/^أ\.\s*/, '');
+      const rows = [...state.rows].filter(r => r.sub).sort((a, b) => slotIdx(a.slot) - slotIdx(b.slot));
+      const cov = rows.filter(r => !BREAKS.has(r.slot)).map(r => `▫️ الحصة ${SLOT_NAME[r.slot] || r.slot} (${r.c}) ← ${nmS(r.sub)}`);
+      const brk = rows.filter(r => BREAKS.has(r.slot)).map(r => `▫️ ${SLOT_NAME[r.slot] || r.slot}${r.c ? ' (' + r.c + ')' : ''} ← ${nmS(r.sub)}`);
       const sw = [];
-      state.swaps.forEach(x => x.items.filter(it => it.b && it.s2).forEach(it => sw.push(`⇄ ${SLOT_NAME[it.s]} (${it.c}): أ. ${short(nm(it.b))}، ويدخل أ. ${short(nm(x.a))} حصته ${SLOT_NAME[it.s2]}`)));
-      if (!lines.length && !sw.length) return '';
-      return `🛡️ التأمين والتبديل — ${weekdayName(date)} ${fmtG(date)}\n\n` + (lines.length ? lines.join('\n') : '') + (sw.length ? (lines.length ? '\n\n' : '') + 'التبديل:\n' + sw.join('\n') : '') + `\n\n📲 فضلًا افتح التطبيق واضغط «استلمت التكليف»:\nhttps://ap-taameen.web.app/app/`;
+      state.swaps.forEach(x => x.items.filter(it => it.b && it.s2).forEach(it => sw.push(`▫️ الحصة ${SLOT_NAME[it.s]} (${it.c}) ← ${nmS(it.b)}\n      ويدخل ${nmS(x.a)} بدله حصته ${SLOT_NAME[it.s2]}`)));
+      if (!cov.length && !brk.length && !sw.length) return '';
+      const L = '━━━━━━━━━━━━';
+      const parts = [`*🛡️ التأمين والتبديل*`, `*${weekdayName(date)} ${fmtG(date)}*`, L];
+      if (cov.length) parts.push(`*📌 تأمين الحصص*`, ...cov, '');
+      if (brk.length) parts.push(`*☕ مراقبة الفسحة*`, ...brk, '');
+      if (sw.length) parts.push(`*⇄ تبديل الحصص*`, ...sw, '');
+      parts.push(L, `📲 فضلًا افتح التطبيق واضغط *«استلمت التكليف»*`, `https://ap-taameen.web.app/app/`, '', `شاكرين تعاونكم 🌷`);
+      return parts.join('\n');
     },
     openSwap() { document.querySelector('.tab[data-tab="swaps"]').click(); },
     swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },

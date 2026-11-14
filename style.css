@@ -556,3 +556,25 @@ h2{font-size:1.45rem}
 .lk-dh .btn{background:#f6d690;color:#4a0a12;border-color:#f6d690;font-weight:700}
 .btn.wa{background:#1f8f4e;color:#fff;border-color:#1f8f4e;font-weight:700}
 .btn.wa:hover{background:#18763f}
+/* شريط الإبلاغ: خطوتان واضحتان + معاينة رسالة الواتساب */
+.send-bar{display:block}
+.send-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.send-head b{font-size:1.08rem;color:#4a0a12;display:block}.send-head small{color:var(--muted)}
+.send-steps{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ss{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;background:#fff;border:1.5px solid #ead9bd}
+.ss .n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#6b0f1a;color:#f6d690;font-weight:700}
+.ss.wa-s .n{background:#1f8f4e;color:#fff}.ss.wa-s{border-color:#bfe3cc;background:#f4fbf6}
+.ss-t{flex:1;min-width:0}.ss-t b{display:block;color:#2b0408}.ss-t small{color:var(--muted);font-size:.8rem;line-height:1.5}
+.ss .btn.big{flex:none;white-space:nowrap}
+.wa-prev{margin-top:12px}
+.wa-prev summary{cursor:pointer;color:#1f8f4e;font-weight:700;font-size:.92rem;padding:4px 0}
+.wa-chat{margin-top:8px;padding:16px;border-radius:14px;background:#e7ddd3 radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px) 0 0/14px 14px}
+.wa-bub{max-width:430px;margin-inline-start:auto;background:#d9fdd3;color:#111b21;border-radius:10px 0 10px 10px;padding:10px 12px;font-size:.92rem;line-height:1.75;box-shadow:0 1px 1px rgba(0,0,0,.12);white-space:normal}
+.wa-bub u{color:#027eb5;text-decoration:none}
+.send-more{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.send-more .link{margin-inline-start:auto}
+@media (max-width:760px){.send-steps{grid-template-columns:1fr}.ss{flex-wrap:wrap}.ss .btn.big{flex:1 1 100%;justify-content:center}}
+.ss{display:grid;grid-template-columns:auto 1fr;align-items:start;row-gap:12px}
+.ss .btn.big{grid-column:1 / -1;width:100%;justify-content:center}
+.wa-bub{margin:0 auto}
+.wa-bub u{direction:ltr;unicode-bidi:isolate;display:inline-block}

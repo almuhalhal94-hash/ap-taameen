@@ -82,12 +82,17 @@
           <div class="cover-list" id="resTable"></div>
           <div class="load-today" id="loadToday"></div>
           <div class="send-bar" id="sendBar">
-            <span class="step">٣</span>
-            <button class="btn send big" data-send-now>📲 إرسال للمعلمين</button>
-            <button class="btn wa" id="btnGroup" title="ينسخ ملخص اليوم لتلصقه في قروب المعلمين">💬 نسخ للقروب</button>
-            <button class="btn" id="btnPdf">تنزيل الكشف PDF</button>
-            <button class="btn" id="btnPrint" hidden>طباعة</button>
-            <button class="link" id="btnRedistribute" title="يلغي اختياراتك اليدوية ويعيد التوزيع">↻ إعادة التوزيع</button>
+            <div class="send-head"><span class="step">٣</span><div><b>إبلاغ المعلمين</b><small>بعد ما تراجع التأمين والتبديل، سوِّ الخطوتين:</small></div></div>
+            <div class="send-steps">
+              <div class="ss"><span class="n">١</span><div class="ss-t"><b>أرسل للتطبيق</b><small>كل معلم يوصله تكليفه في جواله، ويستلم أو يعتذر منه</small></div><button class="btn send big" data-send-now>📲 إرسال للمعلمين</button></div>
+              <div class="ss wa-s"><span class="n">٢</span><div class="ss-t"><b>انسخ رسالة قروب الواتساب</b><small>الصقها في قروب المعلمين عشان يوصلهم الإشعار على طول</small></div><button class="btn wa big" id="btnGroup">💬 نسخ رسالة القروب</button></div>
+            </div>
+            <details class="wa-prev" id="waPrevBox"><summary>👁 معاينة رسالة القروب</summary><div class="wa-chat"><div class="wa-bub" id="waPrev"></div></div></details>
+            <div class="send-more">
+              <button class="btn" id="btnPdf">تنزيل الكشف PDF</button>
+              <button class="btn" id="btnPrint" hidden>طباعة</button>
+              <button class="link" id="btnRedistribute" title="يلغي اختياراتك اليدوية ويعيد التوزيع">↻ إعادة التوزيع</button>
+            </div>
           </div>
         </div>
       </div>
@@ -97,7 +102,7 @@
     <section class="panel" id="tab-swaps">
       <div id="swapWork">
         <div class="card">
-          <div class="card-head"><h2>طلب تبديل أو استئذان</h2><button class="btn wa" data-group title="ينسخ ملخص التأمين والتبديل لليوم لقروب المعلمين">💬 نسخ للقروب</button></div>
+          <div class="card-head"><h2>طلب تبديل أو استئذان</h2><button class="btn wa" data-group title="ينسخ رسالة التأمين والتبديل لليوم لقروب المعلمين">💬 نسخ رسالة القروب</button></div>
           <p class="hint">اختر المعلم ووقت خروجه ورجوعه، والنظام يبادل حصصه مع زميل يدرّس نفس الصف في وقت يكون فيه المعلم موجود. اللي ما له بديل يروح للتأمين.</p>
           <div class="grid2">
             <label class="field"><span>المعلم</span><select id="swTeacher"></select></label>

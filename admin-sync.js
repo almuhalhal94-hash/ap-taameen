@@ -529,6 +529,10 @@
   });
 
   // ---------------- ملخص اليوم لقروب الواتساب ----------------
+  const waHTML = t => esc(t).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(https:\/\/\S+)/g, '<u dir="ltr">$1</u>').replace(/\n/g, '<br>');
+  const refreshPrev = () => { const el = $('#waPrev'); if (!el) return; const t = A.groupText(); el.innerHTML = t ? waHTML(t) : '<span class="muted">ما فيه تأمين أو تبديل في هذا اليوم.</span>'; };
+  document.addEventListener('apt:day', refreshPrev);
+  $('#waPrevBox').addEventListener('toggle', refreshPrev);
   const copyGroup = async () => {
     const t = A.groupText();
     if (!t) return A.toast('ما فيه تأمين أو تبديل في هذا اليوم');
