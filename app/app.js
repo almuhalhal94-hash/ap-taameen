@@ -589,6 +589,12 @@
     await S.set('people/' + key, { pushTokens: { [t.slice(-24).replace(/[^A-Za-z0-9_-]/g, '_')]: t }, pushAt: now() });
     store.set('apt-push-for', key);
   }
+  // أندرويد/سامسونج: زر تثبيت مباشر بدل قوائم المتصفح
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; renderPush(); });
+  window.addEventListener('appinstalled', () => { installEvt = null; toast('✓ انضاف التطبيق للشاشة الرئيسية'); renderPush(); });
+  const installBtn = () => installEvt && !standalone ? `<button type="button" id="btnInstall" class="sec2">📲 تثبيت التطبيق على الشاشة الرئيسية</button>` : '';
+  const bindInstall = () => { const b = $('#btnInstall'); if (b) b.onclick = async () => { SND('tap'); installEvt.prompt(); await installEvt.userChoice.catch(() => { }); installEvt = null; renderPush(); }; };
   function renderPush() {
     const box = $('#pushBox'); if (!box) return;
     const on = 'Notification' in window && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key');
@@ -608,7 +614,8 @@
       return;
     }
     if (Notification.permission === 'denied') { box.innerHTML = `<b>🔕 الإشعارات مقفلة</b><small>فعّلها من إعدادات الجوال للتطبيق أو المتصفح، ثم ارجع هنا.</small>`; return; }
-    box.innerHTML = `<b>🔔 فعّل الإشعارات</b><small>يوصلك تنبيه على الجوال بأي تكليف أو تبديل أو رسالة من الإدارة، حتى والتطبيق مسكّر.</small><button type="button" id="btnPush">تفعيل الإشعارات</button>`;
+    box.innerHTML = `<b>🔔 فعّل الإشعارات</b><small>يوصلك تنبيه على الجوال بأي تكليف أو تبديل أو رسالة من الإدارة، حتى والتطبيق مسكّر.</small><button type="button" id="btnPush">تفعيل الإشعارات</button>${installBtn()}`;
+    bindInstall();
     $('#btnPush').onclick = async () => {
       SND('tap'); const b = $('#btnPush'); b.disabled = true; b.textContent = 'جاري التفعيل…';
       try {
