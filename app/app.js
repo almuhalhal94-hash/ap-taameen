@@ -580,7 +580,7 @@
     if (!(await M.isSupported())) throw new Error('unsupported');
     const reg = await navigator.serviceWorker.register('sw.js');
     await navigator.serviceWorker.ready;
-    return M.getToken(M.getMessaging(getApp()), { serviceWorkerRegistration: reg });
+    return Promise.race([M.getToken(M.getMessaging(getApp()), { serviceWorkerRegistration: reg }), new Promise((_, j) => setTimeout(() => j(new Error('timeout: getToken 25s')), 25000))]);
   }
   async function savePush() {
     const key = store.get('apt-key');
@@ -595,6 +595,16 @@
   window.addEventListener('appinstalled', () => { installEvt = null; toast('✓ انضاف التطبيق للشاشة الرئيسية'); renderPush(); });
   const installBtn = () => installEvt && !standalone ? `<button type="button" id="btnInstall" class="sec2">📲 تثبيت التطبيق على الشاشة الرئيسية</button>` : '';
   const bindInstall = () => { const b = $('#btnInstall'); if (b) b.onclick = async () => { SND('tap'); installEvt.prompt(); await installEvt.userChoice.catch(() => { }); installEvt = null; renderPush(); }; };
+  const settingsHelp = () => {
+    const box = $('#pushBox');
+    box.innerHTML = `<b>🔔 فعّل الإشعارات من إعدادات الجوال</b><small>${isIOS ? 'الإعدادات ← الإشعارات ← «التأمين والتبديل» ← شغّل «السماح بالإشعارات».' : 'اضغط مطوّلًا على أيقونة «التأمين والتبديل» ← «معلومات التطبيق» ← «الإشعارات» ← شغّلها (أو من الإعدادات ← التطبيقات ← Chrome ← الإشعارات).'}<br>بعدها ارجع للتطبيق، ويكتمل التفعيل لحاله.</small><button type="button" id="btnPush">حاولت — أعد المحاولة</button>`;
+    $('#btnPush').onclick = () => { renderPush(); const b = $('#btnPush'); if (b) b.click(); };
+  };
+  // لو رجع المعلم بعد ما سمح من الإعدادات: يكمّل التسجيل لحاله
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && pushOK && Notification.permission === 'granted' && store.get('apt-push-for') !== store.get('apt-key'))
+      savePush().then(() => { toast('✓ تفعّلت الإشعارات'); renderPush(); }).catch(e => console.warn('push', e));
+  });
   function renderPush() {
     const box = $('#pushBox'); if (!box) return;
     const on = 'Notification' in window && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key');
@@ -619,7 +629,9 @@
     $('#btnPush').onclick = async () => {
       SND('tap'); const b = $('#btnPush'); b.disabled = true; b.textContent = 'جاري التفعيل…';
       try {
-        const p = await Notification.requestPermission();
+        // بعض أجهزة سامسونج/كروم تخفي نافذة «سماح» (الوضع الهادئ) فيعلق الطلب — بعد 10 ثواني نشرح الطريق من الإعدادات
+        const p = await Promise.race([Notification.requestPermission(), new Promise(r => setTimeout(() => r('timeout'), 10000))]);
+        if (p === 'timeout') { settingsHelp(); return; }
         if (p !== 'granted') { toast('ما تفعّلت — لازم توافق على الإشعارات'); renderPush(); return; }
         await savePush(); toast('✓ تفعّلت الإشعارات'); SND('send'); renderPush();
       } catch (e) {
