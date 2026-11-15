@@ -715,10 +715,10 @@
       ${body}
       ${note ? `<p class="ps-note">${note}</p>` : ''}
       <div class="ps-foot">
-        <div><div class="role">المدير المساعد</div><div class="pname">${esc(s.assistant)}</div><div class="sigline">التوقيع</div></div>
-        <div><div class="role">مدير المدرسة</div><div class="pname">${esc(s.principal)}</div><div class="sigline">التوقيع</div></div>
+        <div><div class="role">المدير المساعد</div><div class="pname">${esc(s.assistant || 'أ. أنور الجابري')}</div><div class="sigline">التوقيع</div></div>
+        <div><div class="role">مدير المدرسة</div><div class="pname">${esc(s.principal || 'أ. خالد السيد')}</div><div class="sigline">التوقيع</div></div>
       </div>
-      <p class="ps-credit">إعداد: أ. طلال سعود المهلهل</p>`;
+`;
   }
 
   function printDay(iso, data, kind = 'cover') {

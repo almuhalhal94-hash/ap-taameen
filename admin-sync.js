@@ -363,8 +363,8 @@
       ${x.reply ? `<p class="ps-note">تاريخ الرد: ${esc(fmtTime(x.repliedAt))} — مرسل من تطبيق التأمين.</p>` : ''}
       <div class="ps-foot three">
         <div><div class="role">المعلم</div><div class="pname">${esc(x.name)}</div><div class="sigline">التوقيع</div></div>
-        <div><div class="role">المدير المساعد</div><div class="pname">${esc(st.assistant)}</div><div class="sigline">التوقيع</div></div>
-        <div><div class="role">مدير المدرسة</div><div class="pname">${esc(st.principal)}</div><div class="sigline">التوقيع</div></div>
+        <div><div class="role">المدير المساعد</div><div class="pname">${esc(st.assistant || 'أ. أنور الجابري')}</div><div class="sigline">التوقيع</div></div>
+        <div><div class="role">مدير المدرسة</div><div class="pname">${esc(st.principal || 'أ. خالد السيد')}</div><div class="sigline">التوقيع</div></div>
       </div>`;
     const old = document.title; document.title = `استيضاح — ${x.name}`;
     const img = $('#printSheet img');
