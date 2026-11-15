@@ -26,8 +26,9 @@ db.collection('people').onSnapshot(s => {
   firstPeople = false;
   const dv = {}, ow = {};
   s.docs.forEach(d => { const p = d.data(); if (p.revoked || !p.tid || !p.pushTokens) return; for (const [k, t] of Object.entries(p.pushTokens)) { (dv[p.tid] = dv[p.tid] || new Set()).add(t); ow[t] = { doc: d.id, k }; } });
+  const nd = Object.values(dv).reduce((n, x) => n + x.size, 0), was = Object.values(devices).reduce((n, x) => n + x.size, 0);
   devices = dv; owner = ow;
-  log('devices:', Object.values(dv).reduce((n, x) => n + x.size, 0), 'teachers:', Object.keys(dv).length);
+  if (nd !== was) log('devices:', nd, 'teachers:', Object.keys(dv).length);
 }, e => { log('people listener error', e.code); process.exit(1); });
 
 let sentCount = 0;
@@ -67,6 +68,8 @@ db.collection('msgs').onSnapshot(s => {
 }, e => { log('msgs listener error', e.code); process.exit(1); });
 
 log('الحارس شغال — يراقب التكليفات والرسائل');
+const beat = () => db.collection('people').doc('_guard').set({ at: Date.now(), devices: Object.values(devices).reduce((n, x) => n + x.size, 0), teachers: Object.keys(devices).length }).catch(e => log('beat', e.code));
+beat(); setInterval(beat, 60e3);
 // يشتغل على مدار الساعة: قبل حد GitHub (6 ساعات) يشغّل التشغيلة اللي بعده بنفسه ثم ينهي — بدون فجوة
 let handing = false;
 async function handOff() {

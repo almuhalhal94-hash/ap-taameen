@@ -578,3 +578,6 @@ h2{font-size:1.45rem}
 .ss .btn.big{grid-column:1 / -1;width:100%;justify-content:center}
 .wa-bub{margin:0 auto}
 .wa-bub u{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.push-stat{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:9px 14px;border-radius:12px;font-weight:700;font-size:.92rem}
+.push-stat:empty{display:none}.push-stat small{font-weight:400;opacity:.85}
+.push-stat.ok{background:#e9f7ef;color:#1f7a45;border:1px solid #bfe3cc}.push-stat.bad{background:#fdecec;color:#9b1c1c;border:1px solid #f3c1c1}

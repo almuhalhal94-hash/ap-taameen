@@ -72,9 +72,16 @@
     });
   }
 
-  const ready = (cfg && cfg.apiKey ? firebaseApi() : demoApi()).catch(e => {
-    console.warn('تعذّر الاتصال بـ Firebase، التطبيق يشتغل بوضع التجربة', e);
-    return demoApi();
-  });
+  // على الموقع الحي ما ندخل «وضع التجربة» بصمت لو النت ضعيف: نعيد المحاولة ونبيّن للمستخدم
+  const live = cfg && cfg.apiKey;
+  const tryFb = n => firebaseApi().catch(e => {
+    console.warn('تعذّر الاتصال بـ Firebase', e);
+    if (n >= 6) { alert('تعذّر الاتصال بالخادم — تأكد من الإنترنت ثم افتح التطبيق من جديد'); throw e; }
+    let el = document.getElementById('netWarn');
+    if (!el) { el = Object.assign(document.createElement('div'), { id: 'netWarn' }); el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99;background:#9b1c1c;color:#fff;text-align:center;padding:8px;font:600 14px system-ui'; document.body.appendChild(el); }
+    el.textContent = 'جاري الاتصال… تأكد من الإنترنت';
+    return new Promise(r => setTimeout(r, 2500 * n)).then(() => tryFb(n + 1));
+  }).then(api => { const el = document.getElementById('netWarn'); if (el) el.remove(); return api; });
+  const ready = live ? tryFb(1) : demoApi();
   window.Sync = { ready };
 })();

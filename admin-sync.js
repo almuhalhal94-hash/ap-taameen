@@ -580,6 +580,16 @@ footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:
     copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${isSup(t.id) ? ' (معلم + مشرف)' : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
   });
 
+  // ---------------- حالة حارس الإشعارات ----------------
+  async function guardStatus() {
+    const el = $('#pushStat'); if (!el || S.mode === 'demo') return;
+    const g = await S.get('people/_guard').catch(() => null);
+    const ok = g && Date.now() - g.at < 4 * 60e3;
+    el.className = 'push-stat ' + (ok ? 'ok' : 'bad');
+    el.innerHTML = ok ? `🔔 الإشعارات شغالة ✓ <small>${g.teachers} معلم مفعّل</small>` : `⚠️ الإشعارات متوقفة الحين <small>التطبيق يشتغل عادي — بلّغ المعلمين بالقروب، وكلّم أ. طلال</small>`;
+  }
+  guardStatus(); setInterval(guardStatus, 60e3);
+
   // ---------------- ملخص اليوم لقروب الواتساب ----------------
   const waHTML = t => esc(t).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(https:\/\/\S+)/g, '<u dir="ltr">$1</u>').replace(/\n/g, '<br>');
   const refreshPrev = () => { const el = $('#waPrev'); if (!el) return; const t = A.groupText(); el.innerHTML = t ? waHTML(t) : '<span class="muted">ما فيه تأمين أو تبديل في هذا اليوم.</span>'; };

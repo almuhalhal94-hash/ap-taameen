@@ -608,24 +608,28 @@
   function renderPush() {
     const box = $('#pushBox'); if (!box) return;
     const on = 'Notification' in window && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key');
-    if (S.mode === 'demo') { box.hidden = true; return; }
-    if (on) {
-      box.hidden = false; box.classList.add('ok');
-      box.innerHTML = `<b>🔔 الإشعارات مفعّلة على هذا الجهاز</b><button type="button" id="btnPushTest" class="sec">إرسال إشعار تجريبي</button>`;
-      $('#btnPushTest').onclick = async () => { SND('tap'); await S.set('people/' + store.get('apt-key'), { pushTest: now() }); toast('انرسل — سكّر التطبيق، ويوصلك خلال ثواني'); };
+    box.classList.remove('ok', 'warn');
+    // بعد التفعيل يختفي الصندوق نهائيًا
+    if (S.mode === 'demo' || (on && standalone)) { box.hidden = true; return; }
+    box.hidden = false;
+    // مفتوح من المتصفح: لازم ينزّله كتطبيق
+    if (!standalone) {
+      box.classList.add('warn');
+      const how = isIOS
+        ? `<ol class="pb-steps"><li>افتح الرابط في <b>Safari</b></li><li>اضغط زر <b>المشاركة</b> <span class="pb-k">⬆︎</span> تحت</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم «إضافة»</li><li>افتح التطبيق <b>من الأيقونة</b> وفعّل الإشعارات</li></ol>`
+        : (installEvt ? `<button type="button" id="btnInstall">📲 تنزيل التطبيق على جوالك</button>` : `<ol class="pb-steps"><li>اضغط <b>⋮</b> (Chrome فوق) أو <b>☰</b> (سامسونج تحت)</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> أو «تثبيت التطبيق»</li><li>افتح التطبيق <b>من الأيقونة</b> وفعّل الإشعارات</li></ol>`);
+      box.innerHTML = `<b>📲 نزّل التطبيق على جوالك عشان يوصلك التأمين</b><small>أنت فاتح الموقع من المتصفح، وكذا <b>ما توصلك تنبيهات التأمين والتبديل</b>. نزّله كتطبيق مرة وحدة:</small>${how}`;
+      bindInstall();
       return;
     }
-    box.classList.remove('ok');
-    box.hidden = false;
-    if (isIOS && !standalone) { box.innerHTML = `<b>🔔 الإشعارات على الآيفون</b><small>ثبّت التطبيق أول: من سفاري اضغط «مشاركة» ثم «إضافة إلى الشاشة الرئيسية»، وافتحه من الأيقونة، وبيطلع لك زر التفعيل هنا.</small>`; return; }
     if (!pushOK) {
       const iv = (navigator.userAgent.match(/OS (\d+)_(\d+)/) || []).slice(1).join('.');
-      box.innerHTML = `<b>🔕 جهازك ما يدعم الإشعارات</b><small>${isIOS ? `الآيفون يحتاج نظام iOS 16.4 أو أحدث${iv ? ' (جهازك: iOS ' + iv + ')' : ''}، والتطبيق مفتوح من الأيقونة على الشاشة الرئيسية. حدّث النظام من الإعدادات ← عام ← تحديث البرنامج.` : 'افتح التطبيق من متصفح Chrome أو من الأيقونة على الشاشة الرئيسية.'}</small>`;
+      box.classList.add('warn');
+      box.innerHTML = `<b>🔕 جهازك ما يدعم الإشعارات</b><small>${isIOS ? `الآيفون يحتاج نظام iOS 16.4 أو أحدث${iv ? ' (جهازك: iOS ' + iv + ')' : ''}. حدّث النظام من الإعدادات ← عام ← تحديث البرنامج.` : 'حدّث متصفح Chrome من المتجر ثم افتح التطبيق من جديد.'}</small>`;
       return;
     }
-    if (Notification.permission === 'denied') { box.innerHTML = `<b>🔕 الإشعارات مقفلة</b><small>فعّلها من إعدادات الجوال للتطبيق أو المتصفح، ثم ارجع هنا.</small>`; return; }
-    box.innerHTML = `<b>🔔 فعّل الإشعارات</b><small>يوصلك تنبيه على الجوال بأي تكليف أو تبديل أو رسالة من الإدارة، حتى والتطبيق مسكّر.</small><button type="button" id="btnPush">تفعيل الإشعارات</button>${installBtn()}`;
-    bindInstall();
+    if (Notification.permission === 'denied') { box.classList.add('warn'); settingsHelp(); return; }
+    box.innerHTML = `<b>🔔 فعّل الإشعارات</b><small>عشان يوصلك تنبيه على الجوال بأي تأمين أو تبديل أو رسالة من الإدارة، حتى والتطبيق مسكّر.</small><button type="button" id="btnPush">تفعيل الإشعارات</button>`;
     $('#btnPush').onclick = async () => {
       SND('tap'); const b = $('#btnPush'); b.disabled = true; b.textContent = 'جاري التفعيل…';
       try {
