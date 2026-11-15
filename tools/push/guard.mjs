@@ -67,8 +67,14 @@ db.collection('msgs').onSnapshot(s => {
 }, e => { log('msgs listener error', e.code); process.exit(1); });
 
 log('الحارس شغال — يراقب التكليفات والرسائل');
-// ينهي نفسه الساعة 9 الليل أو قبل حد GitHub (6 ساعات) — والتشغيلة اللي بعده تكمل
-setInterval(() => {
-  const h = bhNow().getUTCHours();
-  if (h >= 21 || Date.now() - START > MAX_MS) { log('انتهى الوقت — أُرسل', sentCount); q.then(() => process.exit(0)); }
-}, 30e3);
+// يشتغل على مدار الساعة: قبل حد GitHub (6 ساعات) يشغّل التشغيلة اللي بعده بنفسه ثم ينهي — بدون فجوة
+let handing = false;
+async function handOff() {
+  if (handing) return; handing = true;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${process.env.REPO}/actions/workflows/push-guard.yml/dispatches`, { method: 'POST', headers: { Authorization: 'Bearer ' + process.env.GH_TOKEN, Accept: 'application/vnd.github+json' }, body: JSON.stringify({ ref: 'main' }) });
+    log('handoff → next run', r.status);
+  } catch (e) { log('handoff failed', e.message); }
+  log('انتهت التشغيلة — أُرسل', sentCount); q.then(() => process.exit(0));
+}
+setInterval(() => { if (Date.now() - START > MAX_MS) handOff(); }, 30e3);
