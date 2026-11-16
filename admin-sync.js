@@ -92,8 +92,14 @@
     finally { busy = false; NUDGE = false; if (again) { again = false; publish(false); } }
     renderSend();
   }
-  $('#btnSend').addEventListener('click', () => publish(true));
-  document.querySelectorAll('[data-send-now]').forEach(b => b.addEventListener('click', () => publish(true)));
+  // تأكيد للمدير المساعد قبل الإرسال لو فيه مؤمّن عنده 4 حصص فأكثر اليوم
+  const sendNow = async () => {
+    const h = A.dayHeavyAssigned ? A.dayHeavyAssigned() : [];
+    if (h.length && !(await A.ask(`تنبيه: هؤلاء عندهم 4 حصص فأكثر اليوم:\n${h.join('\n')}\n\nمتأكد ترسل التأمين عليهم؟ (تقدر تغيّرهم من زر «تغيير»)`, 'نعم، أرسل'))) return;
+    publish(true);
+  };
+  $('#btnSend').addEventListener('click', sendNow);
+  document.querySelectorAll('[data-send-now]').forEach(b => b.addEventListener('click', sendNow));
 
   // بعد أول إرسال لليوم: أي تعديل على التأمين يوصل تلقائي
   let tmr;

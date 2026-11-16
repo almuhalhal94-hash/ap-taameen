@@ -366,7 +366,7 @@
     return best;
   }
 
-  const HEAVY = 19; // نصاب 19 حصة فأكثر = للضرورة فقط، ويُفضّل من قسمه
+  const HEAVY = 19, DAY_HEAVY = 4; // 4 حصص فأكثر في نفس اليوم = للضرورة مع تنبيه للمدير المساعد
   function candidates(row, rows, hist, ctx) {
     const s = row.slot, iv = ivOf(s, row.c);
     const absT = byId[row.absent];
@@ -385,7 +385,7 @@
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
       const run = runAfter(ctx, t.id, s, extra[t.id] || []);
       const nAll = all[t.id] || 0;
-      const man = manS.has(t.id), co = coS.has(t.id), heavy = (t.total || 0) >= HEAVY, coord = co || heavy;
+      const man = manS.has(t.id), co = coS.has(t.id), heavy = (t.total || 0) >= HEAVY, dh = load + nAll >= DAY_HEAVY, coord = co || heavy || dh;
       if (isB) {
         // بديل المراقبة: ما يكون عنده حصة قبل الفسحة أو بعدها مباشرة، ثم معلمو المراقبة، والأخف نصابًا، وواحدة باليوم
         const i = SLOT_ORDER.indexOf(s), nb = [SLOT_ORDER[i - 1], SLOT_ORDER[i + 1]].filter(Boolean);
@@ -393,12 +393,12 @@
         const adjS = nb.filter(x => ex.includes(x) || (ctx.cell(t.id, x) && !NON_TEACHING.has(ctx.cell(t.id, x).t)));
         const adj = adjS.length;
         const over = n >= 1 || nAll >= db.settings.maxPerDay, duty = DUTY_T.has(t.id), consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, man, coord, co, heavy, swp: inSwap.has(t.id), key: [man ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
+        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, man, coord, co, heavy, dh, swp: inSwap.has(t.id), key: [man ? 1 : 0, dh ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
       }
       const over = n >= db.settings.maxPerDay || nAll >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-      return { t, h, n, nAll, same, load, run, over, man, coord, co, heavy, swp: inSwap.has(t.id), key: [man ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, coord && !same ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
+      return { t, h, n, nAll, same, load, run, over, man, coord, co, heavy, dh, swp: inSwap.has(t.id), key: [man ? 1 : 0, dh ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, coord && !same ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
     }).sort((a, b) => sortKey(a.key, b.key) || a.t.name.localeCompare(b.t.name, 'ar'));
   }
 
@@ -413,7 +413,7 @@
     const cs = candidates(r, rows, hist, ctx);
     // الرياضة (يدوي فقط) ما تنختار تلقائيًا أبدًا، والمنسق للضرورة قبل التأمين الثاني
     const auto = cs.filter(c => !c.man);
-    const best = auto.find(c => !c.over && !c.coord) || auto.find(c => !c.over) || auto[0];
+    const best = auto[0]; // الترتيب نفسه يطبّق الاعتبارات: العادي ← للضرورة ← التأمين الثاني ← اليوم الثقيل
     r.sub = best ? best.t.id : (emergencyFree(r, rows)[0] || '');
   }
 
@@ -424,13 +424,16 @@
     const ctx = context();
     const hist = historyCounts(date);
     const prev = new Map(state.rows.map(r => [`${r.absent}|${r.slot}`, r]));
+    const lock = !!(db.settings.sentDays || {})[date];
     const rows = needs(ctx).map(n => {
       const old = prev.get(`${n.absent}|${n.slot}`);
-      return { ...n, sub: !resetManual && old && old.m ? old.sub : '', m: !resetManual && old ? !!old.m : false, refused: old && old.refused ? old.refused : [] };
+      // بعد إرسال اليوم: التكليفات المرسلة تنقفل (ما تتغير لو انضاف غائب جديد) — «إعادة التوزيع» بس يفكها
+      const keep = !resetManual && old && old.sub && (old.m || lock);
+      return { ...n, sub: keep ? old.sub : '', m: !resetManual && old ? !!old.m : false, lk: !!(keep && !old.m), refused: old && old.refused ? old.refused : [] };
     });
-    // تحقق من صلاحية اليدوي
-    rows.filter(r => r.m).forEach(r => { if (r.sub && !(isE(r.sub) ? emergencyFree(r, rows).includes(r.sub) : candidates(r, rows, hist, ctx).some(c => c.t.id === r.sub))) { r.sub = ''; r.m = false; } });
-    const pending = rows.filter(r => !r.m);
+    // تحقق من صلاحية اليدوي والمقفول
+    rows.filter(r => r.m || r.lk).forEach(r => { if (r.sub && !(isE(r.sub) ? emergencyFree(r, rows).includes(r.sub) : candidates(r, rows, hist, ctx).some(c => c.t.id === r.sub))) { r.sub = ''; r.m = false; r.lk = false; } });
+    const pending = rows.filter(r => !r.m && !r.lk);
     pending.forEach(r => { r.sub = ''; });
     while (pending.length && db.settings.coverMode !== 'manual') {
       pending.forEach(r => { const cs = candidates(r, rows, hist, ctx); r._n = cs.filter(c => !c.over && !c.man && !c.coord).length + (cs.some(c => !c.man) ? .5 : 0); });
@@ -522,7 +525,7 @@
   }
   // ملاحظة المرشّح بكلام بسيط
   const candNote = (c, r) => [c.same ? 'نفس القسم' : c.t.dept, c.h ? `أمّن سابقًا ${arNum(c.h)} ${c.h > 2 ? 'مرات' : 'مرة'}` : 'ما أمّن سابقًا', `نصابه اليوم ${arNum(c.load)} ${c.load > 2 && c.load < 11 ? 'حصص' : 'حصة'}`, c.swp ? 'عنده تبديل اليوم' : ''].filter(Boolean).join('، ');
-  const candWarn = (c, r, all) => [all && c.man ? 'معلم رياضة — اختيار يدوي من الإدارة' : '', c.co ? 'منسق القسم — للضرورة فقط' : '', c.heavy && !c.co ? `نصابه ${arNum(c.t.total)} حصة — للضرورة فقط` : '', c.coord && !c.same && !BREAKS.has(r.slot) ? 'من خارج قسمه' : '', c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
+  const candWarn = (c, r, all) => [all && c.man ? 'معلم رياضة — اختيار يدوي من الإدارة' : '', c.co ? 'منسق القسم — للضرورة فقط' : '', c.dh ? `عنده ${arNum(c.load + c.nAll)} حصص اليوم — للضرورة` : '', c.heavy && !c.co && !c.dh ? `نصابه ${arNum(c.t.total)} حصة — للضرورة فقط` : '', c.coord && !c.same && !BREAKS.has(r.slot) ? 'من خارج قسمه' : '', c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
   function rowInfo(r, i, hist, ctx) {
     const cands = candidates(r, state.rows, hist, ctx);
     const cur = cands.find(c => c.t.id === r.sub);
@@ -590,7 +593,7 @@
     const hist = historyCounts(date), ctx = context();
     const cs = candidates(r, state.rows, hist, ctx);
     const manL = cs.filter(c => c.man), base = cs.filter(c => !c.man);
-    const list = [...base.filter(c => !c.over && !c.coord), ...base.filter(c => !c.over && c.coord), ...base.filter(c => c.over)];
+    const list = [...base]; // مرتبين بنفس الاعتبارات (العادي ← للضرورة ← التأمين الثاني ← اليوم الثقيل)
     const shown = pickAll ? list : list.slice(0, 5);
     const sp = slotPlain(r.slot, r.c);
     $('#pkHead').innerHTML = `<small>بدل ${esc(nm(r.absent))}</small><b>الحصة ${esc(sp.name)} · ${BREAKS.has(r.slot) ? 'مراقبة' : codeHTML(r.c)}</b><small>${esc(r.t)} · <bdi dir="ltr">${sp.time}</bdi></small>`;
@@ -879,6 +882,7 @@
       <div class="rule"><i class="r-man">✋</i><div><b>يدوي فقط (التربية الرياضية)</b><small>ما ينختارون تلقائيًا ولا بعد اعتذار أحد — الإدارة تختارهم بنفسها من «تغيير» إذا بغت</small><div class="rns">${names([...man])}</div></div></div>
       <div class="rule"><i class="r-co">⚠</i><div><b>المنسقون والمعلمون الأوائل — للضرورة فقط</b><small>يُجرَّب كل المعلمين قبلهم، ولو اضطر البرنامج يعطيهم تطلع علامة برتقالية</small><div class="rns">${names([...co])}</div></div></div>
       <div class="rule"><i class="r-co">📚</i><div><b>أصحاب النصاب العالي (19 و20 حصة) — للضرورة فقط، ومن قسمهم</b><small>ما يأمّنون إلا إذا ما فيه غيرهم، وإذا اضطر البرنامج يختار من نفس قسم الغائب أول، ومن خارج القسم آخر شي مع تنبيه</small><div class="rns">${names(T.filter(t => (t.total || 0) >= HEAVY && !NO_COVER.has(t.id) && !(db.settings.manualOnly || []).includes(t.id)).map(t => t.id))}</div></div></div>
+      <div class="rule"><i class="r-co">④</i><div><b>عنده 4 حصص فأكثر في نفس اليوم — للضرورة فقط</b><small>ما يأمّن إلا إذا ما فيه غيره، وتطلع علامة برتقالية، ويطلب البرنامج تأكيد المدير المساعد عند اختياره وقبل الإرسال</small></div></div>
       <div class="rule"><i class="r-sup">👁</i><div><b>المشرفون — صفوف إشرافهم فقط</b><small>ما يأمّنون إلا صفوف المراحل اللي يشرفون عليها (وتتعدّل من «المعلمون»)</small><div class="rns">${sups.map(id => `<span class="rn">${esc(nm(id).replace(/^أ\.\s*/, ''))} <small>${esc(supLabel(id))}</small></span>`).join('') || '<span class="muted">لا أحد</span>'}</div></div></div>
       <div class="rule"><i class="r-gen">١</i><div><b>تأمين واحد باليوم للمعلم</b><small>الثاني للضرورة فقط مع تنبيه، والثالث ممنوع نهائيًا (يروح للإدارة)</small></div></div>
       <div class="rule"><i class="r-gen">☕</i><div><b>مراقبة الفسحة</b><small>ما تُعطى لمن عنده حصة قبل الفسحة أو بعدها مباشرة</small></div></div>
@@ -956,7 +960,11 @@
     if (e.target.closest('[data-pkall]')) { pickAll = true; return renderPick(); }
     const r = state.rows[pickRow]; if (!r) return;
     const pk = e.target.closest('[data-pk]');
-    if (pk) { r.sub = pk.dataset.pk; r.m = true; commit(); renderResults(); closePick(); toast(`المؤمّن: ${nm(r.sub)}`); return; }
+    if (pk) {
+      const c = candidates(r, state.rows, historyCounts(date), context()).find(x => x.t.id === pk.dataset.pk);
+      if (c && c.dh && !(await ask(`تأكيد: ${nm(c.t.id)} عنده ${arNum(c.load + c.nAll)} حصص اليوم.\nمتأكد تعطيه تأمين الحصة ${slotPlain(r.slot, r.c).name}؟`, 'نعم، أعطه'))) return;
+      r.sub = pk.dataset.pk; r.m = true; commit(); renderResults(); closePick(); toast(`المؤمّن: ${nm(r.sub)}`); return;
+    }
     if (e.target.closest('#pkNone')) { if (!(await ask(`متأكد تريد ترك الحصة ${slotPlain(r.slot, r.c).name} بدل ${nm(r.absent)} بدون تأمين؟\n(${nm(r.sub)} ينشال منها)`, 'نعم، بدون تأمين'))) return; r.sub = ''; r.m = true; commit(); renderResults(); renderPick(); return; }
     if (e.target.closest('#pkRefuse')) {
       if (!(await ask(`متأكد إن ${nm(r.sub)} اعتذر عن الحصة ${slotPlain(r.slot, r.c).name}؟\nبتنتقل للمعلم اللي بعده تلقائيًا.`, 'نعم، اعتذر'))) return;
@@ -1102,7 +1110,7 @@
     refreshSum() { if (D() !== -1) renderSummary(); },
     saveSettings() { persist(); cloudConfig(); },
     // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
-    ranked(row) { const cs = candidates(row, state.rows, historyCounts(date), context()).filter(c => !c.man); return [...cs.filter(c => !c.over && !c.coord), ...cs.filter(c => !c.over && c.coord), ...cs.filter(c => c.over)].map(c => c.t.id); },
+    ranked(row) { return candidates(row, state.rows, historyCounts(date), context()).filter(c => !c.man).map(c => c.t.id); },
     // طلب تبديل من معلم (من التطبيق): يرتّبه تلقائيًا بنفس قواعد التبديل، ويفضّل الزميل المقترح إن أمكن
     swapRequest(iso, a, slots, reason, prefer) {
       if (iso !== date) { $('#dateInput').value = iso; swDraft = newDraft(); loadDate(iso); }
@@ -1161,6 +1169,12 @@
       if (sw.length) parts.push(`*⇄ تبديل الحصص*`, ...sw, '');
       parts.push(L, `📲 فضلًا افتح التطبيق واضغط *«استلمت التكليف»*`, `https://ap-taameen.web.app/app/`, '', `شاكرين تعاونكم 🌷`);
       return parts.join('\n');
+    },
+    dayHeavyAssigned() {
+      if (D() === -1) return [];
+      const ctx = context(), out = [];
+      state.rows.forEach(r => { if (!r.sub || isE(r.sub)) return; const n = dayCells(ctx, r.sub).filter(x => !NON_TEACHING.has(x.cell.t)).length; if (n >= DAY_HEAVY) out.push(`• ${nm(r.sub)} — عنده ${arNum(n)} حصص، ويأمّن ${slotPlain(r.slot, r.c).name} (${r.c || ''})`); });
+      return out;
     },
     openSwap() { document.querySelector('.tab[data-tab="swaps"]').click(); },
     swapRanked(sw, it) { return swapOptions(sw, it, historyCounts(date)).filter(o => !o.covering).map(o => ({ b: o.b, s2: o.s2, t2: o.t2 })); },
