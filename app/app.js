@@ -5,6 +5,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل حصة' };
+  let focusId = ''; // التكليف اللي اختاره المعلم يطلع فوق
   const pad = n => String(n).padStart(2, '0');
   const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const TODAY = isoOf(new Date());
@@ -243,8 +244,18 @@
       <div class="stamp yes">استلمت ✓</div><div class="stamp no">عذر رسمي</div>`;
   }
 
+  function renderPendBar(pend) {
+    const bar = $('#pendBar'); if (!bar) return;
+    if (pend.length < 2) { bar.hidden = true; return; }
+    const IC = { cover: '🛡', duty: '☕', swap: '⇄' };
+    bar.hidden = false;
+    bar.innerHTML = `<b>عندك ${pend.length === 2 ? 'تكليفان' : pend.length + ' تكليفات'} — كل واحد له استلام مستقل:</b><div class="pb-chips">${pend.map((d, i) => `<button type="button" class="pb-chip ${i === 0 ? 'on' : ''}" data-focus="${esc(d.id)}"><i>${IC[d.kind] || '•'}</i>${esc(KIND[d.kind] || '')}<small>${esc(d.slotName || '')}${d.date !== TODAY ? ' · ' + esc(d.day || d.date) : ''}</small></button>`).join('')}</div>`;
+  }
+  $('#pendBar').addEventListener('click', e => { const b = e.target.closest('[data-focus]'); if (!b) return; SND('tap'); focusId = b.dataset.focus; renderTasks(); });
   function renderTasks() {
-    const pend = mine.filter(d => d.status === 'pending');
+    let pend = mine.filter(d => d.status === 'pending');
+    if (focusId && pend.some(d => d.id === focusId)) pend = [pend.find(d => d.id === focusId), ...pend.filter(d => d.id !== focusId)];
+    renderPendBar(pend);
     setNb('#nbTasks', pend.length);
     const stack = $('#stack'), ids = pend.slice(0, 3).map(d => d.id);
     [...stack.children].forEach(el => { if (!ids.includes(el.dataset.id) && !el.classList.contains('leaving')) el.remove(); });
@@ -509,14 +520,14 @@
   const nextWork = (from, add) => { const d = new Date(from); d.setDate(d.getDate() + add); while (d.getDay() > 4) d.setDate(d.getDate() + 1); return isoOf(d); };
   $('#btnAbs').addEventListener('click', async () => {
     SND('tap');
-    const MIN = nextWork(new Date(), 1), MAXD = new Date(); MAXD.setDate(MAXD.getDate() + 60); const MAX = isoOf(MAXD);
+    const MIN = TODAY, DEF = new Date().getDay() > 4 ? nextWork(new Date(), 1) : TODAY, MAXD = new Date(); MAXD.setDate(MAXD.getDate() + 60); const MAX = isoOf(MAXD);
     const picked = new Set(); let kind = '';
     const myT = ((window.TIMETABLE || {}).teachers || []).find(t => t.id === me.tid);
     const wdOf = v => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
     const myDay = v => { if (!v) return []; const wd = wdOf(v); if (wd > 4 || !myT || (myT.days && !myT.days.includes(wd))) return []; return Object.keys(PER).map(k => ({ k, c: myT.cells[wd + '-' + k] })).filter(x => x.c && x.c.t === 'حصة').map(x => ({ k: x.k, cls: x.c.c })); };
     const v = await sheet(`<div class="sh-ic abs">✉</div><h3>طلب تأمين حصص</h3>
-      <p class="sh-sum">في حال <b>غيابك عن العمل بعذر رسمي</b> معروف مسبقًا، قدّم الطلب <b>قبل موعد الغياب بيوم عمل على الأقل</b>، لتتمكّن الإدارة من توزيع حصصك على الزملاء وإبلاغهم في وقت مناسب.</p>
-      <p class="lbl">يوم الغياب <span class="req">*</span></p><input type="date" id="abDate" class="rq-in" min="${MIN}" max="${MAX}" value="${MIN}"><p class="rq-sel" id="abDay"></p>
+      <p class="sh-sum">في حال <b>غيابك عن العمل بعذر رسمي</b> معروف مسبقًا، قدّم الطلب <b>في أقرب وقت</b> — ولو الظرف طارئ اليوم (تكليف مفاجئ، زيارة مشرف تربوي…) تقدر تختار تاريخ اليوم، والإدارة توزّع حصصك على الزملاء.</p>
+      <p class="lbl">يوم الغياب <span class="req">*</span></p><input type="date" id="abDate" class="rq-in" min="${MIN}" max="${MAX}" value="${DEF}"><p class="rq-sel" id="abDay"></p>
       <p class="lbl">نوع العذر <span class="req">*</span></p><div class="ab-kinds" id="abKinds">${ABS_KINDS.map(k => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>
       <p class="lbl">الحصص المطلوب تأمينها <span class="req">*</span> <small class="muted">— محدّدة كلها، اضغط لإلغاء ما لا يلزم</small></p><div class="rq-per" id="abPer"></div>
       <p class="rq-sel" id="abSel"></p>
@@ -526,7 +537,7 @@
       <div class="sheet-btns"><button class="b-ok" data-x="go">إرسال الطلب للإدارة</button><button class="b-ghost" data-x="close">رجوع</button></div>`, {
       go: () => {
         const date = $('#abDate').value, L = myDay(date);
-        const err = !date ? 'اختر يوم الغياب.' : wdOf(date) > 4 ? 'هذا اليوم عطلة نهاية الأسبوع.' : date < MIN ? 'الطلب يُقدَّم قبل الغياب بيوم عمل على الأقل. للغياب اليوم تواصل مع الإدارة مباشرة.' : date > MAX ? 'اختر يومًا خلال الشهرين القادمين.' : wdOf(date) > 4 ? 'هذا اليوم عطلة نهاية الأسبوع.' : !L.length ? 'ما عندك حصص تدريس في هذا اليوم.' : !kind ? 'اختر نوع العذر.' : !picked.size ? 'اختر حصة وحدة على الأقل.' : !$('#abOk').checked ? 'أكّد التعهّد بتقديم ما يُثبت العذر.' : '';
+        const err = !date ? 'اختر يوم الغياب.' : wdOf(date) > 4 ? 'هذا اليوم عطلة نهاية الأسبوع.' : date < MIN ? 'هذا التاريخ مضى — اختر اليوم أو يومًا قادمًا.' : date > MAX ? 'اختر يومًا خلال الشهرين القادمين.' : wdOf(date) > 4 ? 'هذا اليوم عطلة نهاية الأسبوع.' : !L.length ? 'ما عندك حصص تدريس في هذا اليوم.' : !kind ? 'اختر نوع العذر.' : !picked.size ? 'اختر حصة وحدة على الأقل.' : !$('#abOk').checked ? 'أكّد التعهّد بتقديم ما يُثبت العذر.' : '';
         if (err) { $('#abErr').textContent = err; buzz(30); return false; }
         const cls = {}; L.forEach(x => { if (picked.has(x.k)) cls[x.k] = x.cls; });
         return { date, kindTxt: kind, reason: $('#abWhy').value.trim(), slots: [...picked].sort(), cls, full: picked.size === L.length };

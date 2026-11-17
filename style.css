@@ -591,3 +591,4 @@ table.cs .bar-c{min-width:150px;white-space:nowrap}
 table.cs .bar{display:inline-block;width:100px;height:9px;border-radius:9px;background:#f0e6d6;vertical-align:middle;margin-left:8px;overflow:hidden}
 table.cs .bar i{display:block;height:100%;background:linear-gradient(90deg,#b8862b,#6b0f1a);border-radius:9px}
 table.cs small{color:#7a6650}
+.urg{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:8px;background:#fdecec;color:#9b1c1c;font-size:.8rem;font-weight:700}

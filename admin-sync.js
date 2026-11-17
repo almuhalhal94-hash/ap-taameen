@@ -401,7 +401,8 @@
     const btns = q.status !== 'pending' ? '' : ab
       ? `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-ab-ok="${q.id}">✓ اعتماد وتوزيع حصصه</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>`
       : `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-rq-auto="${q.id}">⚡ تبديل تلقائي</button><button class="btn sm" data-rq-manual="${q.id}">✋ أرتبه بنفسي</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>`;
-    const head = ab ? `طلب تأمين حصص (غياب بعذر رسمي) من ${esc(q.name)}` : `طلب تبديل من ${esc(q.name)}`;
+    const urgent = q.date === A.isoOf(new Date()) ? ' <span class="urg">🔴 اليوم — طارئ</span>' : '';
+    const head = (ab ? `طلب تأمين حصص (غياب بعذر رسمي) من ${esc(q.name)}` : `طلب تبديل من ${esc(q.name)}`) + urgent;
     const why = ab ? `العذر: <b>${esc(q.kindTxt || '')}</b>${q.reason ? ` — «${esc(q.reason)}»` : ''} · تعهّد بتقديم الإثبات` : `السبب: «${esc(q.reason)}»${q.prefer ? ` · الزميل المقترح: <b>${esc(q.prefer)}</b>` : ''}`;
     return `<div class="resp v-${st[0]} ${ab ? 'is-abs' : ''}"><div class="vstate">${st[1]} — ${head}</div>
       <div class="rw"><b>${when}</b> · الحصص: <b>${per}</b></div>

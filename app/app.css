@@ -286,3 +286,10 @@ button,a,[data-p]{touch-action:manipulation}
 .push-box.warn > b{color:#ffcf9e}
 .pb-steps{margin:4px 0 0;padding:0 20px 0 0;font-size:.86rem;line-height:1.9;color:var(--ink)}
 .pb-steps b{color:#f6d690}.pb-k{display:inline-block;padding:0 6px;border-radius:6px;background:rgba(255,255,255,.12)}
+/* شريط التكليفات المعلّقة: كل تكليف مستقل */
+.pend-bar{margin:10px 0 4px;padding:12px 14px;border-radius:16px;background:rgba(226,180,90,.10);border:1.5px solid rgba(226,180,90,.5)}
+.pend-bar > b{display:block;color:#f6d690;font-size:.9rem;margin-bottom:8px}
+.pb-chips{display:flex;gap:8px;flex-wrap:wrap}
+.pb-chip{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface2);color:var(--ink);font:inherit;font-size:.85rem;font-weight:700;cursor:pointer}
+.pb-chip i{font-style:normal}.pb-chip small{font-weight:400;color:var(--muted)}
+.pb-chip.on{border-color:#e2b45a;background:rgba(226,180,90,.18);color:#f6d690}
