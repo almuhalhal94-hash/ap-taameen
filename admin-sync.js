@@ -7,7 +7,7 @@
   const esc = A.esc;
   const S = await window.Sync.ready;
   const DEMO = S.mode === 'demo';
-  let docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false, reqs = [], reqsReady = false;
+  let csRange = 'week', docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false, reqs = [], reqsReady = false;
   const ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
   const now = () => Date.now();
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل' };
@@ -596,6 +596,31 @@ footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:
   }
   guardStatus(); setInterval(guardStatus, 60e3);
 
+  // ---------------- إحصائية التأمين من السحابة (لكل الأجهزة) ----------------
+  function renderCloudStats() {
+    const box = $('#csTable'); if (!box) return;
+    const now = new Date(), iso = A.isoOf(now);
+    const sun = new Date(now); sun.setDate(now.getDate() - now.getDay());
+    const from = csRange === 'week' ? A.isoOf(sun) : csRange === 'month' ? iso.slice(0, 8) + '01' : '0000';
+    const docs = allDocs.filter(d => d.date >= from && d.date <= iso && d.status !== 'cancelled');
+    const per = {}; let refusals = 0;
+    const row = id => (per[id] = per[id] || { cover: 0, duty: 0, swap: 0, ok: 0, wait: 0, ref: 0 });
+    docs.forEach(d => {
+      (d.refused || []).forEach(t => { row(t).ref++; refusals++; });
+      if (!d.to || d.status === 'none' || d.status === 'emergency') return;
+      const r = row(d.to); r[d.kind === 'duty' ? 'duty' : d.kind === 'swap' ? 'swap' : 'cover']++;
+      if (d.status === 'accepted') r.ok++; else if (d.status === 'pending') r.wait++;
+    });
+    const T = [...A.T].map(t => ({ t, ...(per[t.id] || { cover: 0, duty: 0, swap: 0, ok: 0, wait: 0, ref: 0 }) }));
+    T.forEach(x => { x.total = x.cover + x.duty; });
+    T.sort((a, b) => b.total - a.total || b.swap - a.swap || a.t.name.localeCompare(b.t.name, 'ar'));
+    const tot = T.reduce((n, x) => n + x.total, 0), acc = T.reduce((n, x) => n + x.ok, 0), mx = Math.max(1, ...T.map(x => x.total));
+    $('#csKpis').innerHTML = `<div class="kpi"><b>${tot}</b><span>حصة تأمين ومراقبة</span></div><div class="kpi"><b>${T.filter(x => x.total).length}</b><span>معلم أمّن</span></div><div class="kpi"><b>${tot ? Math.round(acc / Math.max(1, T.reduce((n, x) => n + x.ok + x.wait, 0)) * 100) : 0}%</b><span>نسبة الاستلام</span></div><div class="kpi"><b>${refusals}</b><span>اعتذار</span></div>`;
+    box.innerHTML = `<table class="cs"><thead><tr><th>المعلم</th><th>القسم</th><th>تأمين</th><th>مراقبة</th><th>تبديل</th><th>اعتذار</th><th class="bar-h">النسبة</th></tr></thead><tbody>` +
+      T.map(x => `<tr class="${x.total ? '' : 'zero'}"><td><b>${esc(x.t.name)}</b></td><td class="muted">${esc(x.t.dept || '')}</td><td>${x.cover || '–'}</td><td>${x.duty || '–'}</td><td>${x.swap || '–'}</td><td>${x.ref || '–'}</td><td class="bar-c"><span class="bar"><i style="width:${Math.round(x.total / mx * 100)}%"></i></span><small>${tot ? Math.round(x.total / tot * 100) : 0}%</small></td></tr>`).join('') + '</tbody></table>';
+  }
+  $('#csRange').addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (!b) return; csRange = b.dataset.r; $('#csRange').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderCloudStats(); });
+
   // ---------------- ملخص اليوم لقروب الواتساب ----------------
   const waHTML = t => esc(t).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(https:\/\/\S+)/g, '<u dir="ltr">$1</u>').replace(/\n/g, '<br>');
   const refreshPrev = () => { const el = $('#waPrev'); if (!el) return; const t = A.groupText(); el.innerHTML = t ? waHTML(t) : '<span class="muted">ما فيه تأمين أو تبديل في هذا اليوم.</span>'; };
@@ -617,7 +642,7 @@ footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:
   const saveSeen = () => { try { localStorage.setItem('apt-admin-seen', JSON.stringify([...seenA].slice(-500))); } catch (e) { } };
   const today = A.isoOf(new Date());
   S.watch('assign', null, list => {
-    allDocs = list;
+    allDocs = list; renderCloudStats();
     const fresh = [];
     alerts = [];
     for (const d of list) {

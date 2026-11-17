@@ -581,3 +581,13 @@ h2{font-size:1.45rem}
 .push-stat{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:9px 14px;border-radius:12px;font-weight:700;font-size:.92rem}
 .push-stat:empty{display:none}.push-stat small{font-weight:400;opacity:.85}
 .push-stat.ok{background:#e9f7ef;color:#1f7a45;border:1px solid #bfe3cc}.push-stat.bad{background:#fdecec;color:#9b1c1c;border:1px solid #f3c1c1}
+/* إحصائية السحابة */
+.cs-table{overflow-x:auto}
+table.cs{width:100%;border-collapse:collapse;font-size:.92rem}
+table.cs th{background:#f6ecd8;color:#4a0a12;padding:9px 8px;text-align:right;position:sticky;top:0}
+table.cs td{padding:8px;border-bottom:1px solid #f0e6d6;text-align:right}
+table.cs tr.zero td{opacity:.45}
+table.cs .bar-c{min-width:150px;white-space:nowrap}
+table.cs .bar{display:inline-block;width:100px;height:9px;border-radius:9px;background:#f0e6d6;vertical-align:middle;margin-left:8px;overflow:hidden}
+table.cs .bar i{display:block;height:100%;background:linear-gradient(90deg,#b8862b,#6b0f1a);border-radius:9px}
+table.cs small{color:#7a6650}
