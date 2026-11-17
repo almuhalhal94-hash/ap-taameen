@@ -7,7 +7,7 @@
   const esc = A.esc;
   const S = await window.Sync.ready;
   const DEMO = S.mode === 'demo';
-  let csRange = 'week', docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false, reqs = [], reqsReady = false;
+  let pstat = [], csRange = 'week', docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false, reqs = [], reqsReady = false;
   const ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
   const now = () => Date.now();
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل' };
@@ -389,6 +389,7 @@
       try { if ('Notification' in window && Notification.permission === 'granted') new Notification(t, { body, lang: 'ar', dir: 'rtl', tag: q.id }); } catch (e) { }
     });
     reqs = nq; reqsReady = true;
+    pstat = all.filter(m => m.type === 'pushstat'); renderPushStats();
     msgs = all.filter(m => !m.type).sort((a, b) => a.at - b.at); renderPeople(); renderThread(); renderReqs(); renderAlerts(); badge();
   });
   function reqCardHTML(q, compact) {
@@ -586,6 +587,20 @@ footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:
     const C = codes(); if (!Object.keys(C).length) return A.toast('جهّز الرموز أول');
     copy([...A.T].filter(t => C[t.id]).sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(t => `${short(t.name)}: ${C[t.id]}${isSup(t.id) ? ' (معلم + مشرف)' : ''}`).join('\n') + `\n\nالرابط: ${APP_URL}`);
   });
+
+  // ---------------- حالة الإشعارات عند كل معلم (بالأسماء) ----------------
+  function renderPushStats() {
+    const box = $('#pushList'); if (!box) return;
+    const by = Object.fromEntries(pstat.map(p => [p.tid, p]));
+    const WHY = { browser: 'فاتح من المتصفح (لازم يثبّته على الشاشة الرئيسية)', notyet: 'ما ضغط «تفعيل الإشعارات»', denied: 'الإشعارات مقفلة من إعدادات جواله', unsupported: 'نظام جواله قديم أو المتصفح ما يدعم', error: 'تعذّر تسجيل جواله' };
+    const on = [], off = [], never = [];
+    [...A.T].sort((a, b) => a.name.localeCompare(b.name, 'ar')).forEach(t => { const p = by[t.id]; if (!p) never.push(t); else if (p.ok) on.push([t, p]); else off.push([t, p]); });
+    const pl = p => p.platform ? `<small class="pl">${esc(p.platform === 'iPhone' ? 'آيفون' : p.platform === 'Samsung' ? 'سامسونج' : p.platform === 'Android' ? 'أندرويد' : '')}</small>` : '';
+    box.innerHTML = `<div class="ps-sum"><span class="ok">✅ مفعّلة: <b>${on.length}</b></span><span class="bad">❌ غير مفعّلة: <b>${off.length}</b></span><span class="nv">⏳ ما فتح التطبيق بعد التحديث: <b>${never.length}</b></span></div>
+      ${off.length ? `<h3 class="ps-h">❌ غير مفعّلة — كلّمهم:</h3>` + off.map(([t, p]) => `<div class="ps-row bad"><b>${esc(t.name)}</b>${pl(p)}<span>${esc(WHY[(p.reason || '').split(':')[0]] || p.reason || '')}</span></div>`).join('') : ''}
+      ${never.length ? `<h3 class="ps-h">⏳ ما فتح التطبيق من بعد التحديث (17 نوفمبر):</h3><div class="ps-chips">${never.map(t => `<span>${esc(t.name.replace(/^أ\.\s*/, ''))}</span>`).join('')}</div>` : ''}
+      ${on.length ? `<h3 class="ps-h">✅ مفعّلة:</h3><div class="ps-chips ok">${on.map(([t, p]) => `<span>${esc(t.name.replace(/^أ\.\s*/, ''))}</span>`).join('')}</div>` : ''}`;
+  }
 
   // ---------------- حالة حارس الإشعارات ----------------
   async function guardStatus() {

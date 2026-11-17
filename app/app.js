@@ -630,7 +630,7 @@
   // لو رجع المعلم بعد ما سمح من الإعدادات: يكمّل التسجيل لحاله
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && pushOK && Notification.permission === 'granted' && store.get('apt-push-for') !== store.get('apt-key'))
-      savePush().then(() => { toast('✓ تفعّلت الإشعارات'); renderPush(); }).catch(e => console.warn('push', e));
+      savePush().then(() => { pushStat(true, standalone ? '' : 'browser-ok'); toast('✓ تفعّلت الإشعارات'); renderPush(); }).catch(e => console.warn('push', e));
   });
   function renderPush() {
     const box = $('#pushBox'); if (!box) return;
@@ -664,7 +664,7 @@
         const p = await Promise.race([Notification.requestPermission(), new Promise(r => setTimeout(() => r('timeout'), 10000))]);
         if (p === 'timeout') { settingsHelp(); return; }
         if (p !== 'granted') { toast('ما تفعّلت — لازم توافق على الإشعارات'); renderPush(); return; }
-        await savePush(); toast('✓ تفعّلت الإشعارات'); SND('send'); renderPush();
+        await savePush(); pushStat(true, standalone ? '' : 'browser-ok'); toast('✓ تفعّلت الإشعارات'); SND('send'); renderPush();
       } catch (e) {
         console.warn(e); const msg = String((e && (e.code || e.name)) || '') + ' ' + String((e && e.message) || e).slice(0, 160);
         S.set('people/' + store.get('apt-key'), { pushErr: msg, pushErrAt: now(), ua: navigator.userAgent.slice(0, 160) }).catch(() => { });
@@ -674,10 +674,13 @@
     };
   }
   renderPush();
-  if (S.mode !== 'demo' && !(('Notification' in window) && Notification.permission === 'granted' && store.get('apt-push-for') === store.get('apt-key')))
-    S.add('msgs', { type: 'diag', tid: ME, at: now(), ua: navigator.userAgent.slice(0, 200), standalone, sw: 'serviceWorker' in navigator, pm: 'PushManager' in window, nt: 'Notification' in window, perm: 'Notification' in window ? Notification.permission : 'none', pushFor: store.get('apt-push-for') === store.get('apt-key') }).catch(() => { });
-  // لو سبق ووافق (أو تغيّر رمزه بعد التجديد) يتسجّل جهازه بصمت
-  if (pushOK && Notification.permission === 'granted' && store.get('apt-push-for') !== store.get('apt-key')) savePush().then(renderPush).catch(e => console.warn('push', e));
+  // حالة الإشعارات لكل معلم (تطلع للإدارة بالأسماء): مسجّل فعلًا ولا لا، والسبب
+  const platform = isIOS ? 'iPhone' : /Android/.test(navigator.userAgent) ? (/Samsung/i.test(navigator.userAgent) ? 'Samsung' : 'Android') : 'other';
+  const pushStat = (ok, reason) => S.mode === 'demo' ? null : S.set('msgs/ps_' + ME, { type: 'pushstat', tid: ME, name: me.name, ok, reason: reason || '', standalone, platform, at: now() }).catch(() => { });
+  const why = () => !standalone && isIOS ? 'browser' : !pushOK ? 'unsupported' : Notification.permission === 'denied' ? 'denied' : Notification.permission === 'default' ? 'notyet' : 'error';
+  // كل ما يفتح التطبيق: لو الإذن موجود يتجدد تسجيل الجوال (يرجّع أي تسجيل انقطع)، وإلا يبلّغ السبب
+  if (pushOK && Notification.permission === 'granted') savePush().then(() => { pushStat(true, standalone ? '' : 'browser-ok'); renderPush(); }).catch(e => { pushStat(false, 'error: ' + String(e && (e.code || e.message) || e).slice(0, 80)); });
+  else pushStat(false, why());
 
   // الرمز الملغى (بعد تجديد الرموز) يطلّع المعلم لشاشة الدخول حتى لو التطبيق مفتوح — وانقطاع النت ما يطلّعه
   const recheck = async () => {

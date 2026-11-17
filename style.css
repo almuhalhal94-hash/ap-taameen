@@ -592,3 +592,12 @@ table.cs .bar{display:inline-block;width:100px;height:9px;border-radius:9px;back
 table.cs .bar i{display:block;height:100%;background:linear-gradient(90deg,#b8862b,#6b0f1a);border-radius:9px}
 table.cs small{color:#7a6650}
 .urg{display:inline-block;margin-inline-start:6px;padding:1px 8px;border-radius:8px;background:#fdecec;color:#9b1c1c;font-size:.8rem;font-weight:700}
+/* حالة الإشعارات عند المعلمين */
+.ps-sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ps-sum span{padding:7px 12px;border-radius:10px;font-size:.9rem}
+.ps-sum .ok{background:#e9f7ef;color:#1f7a45}.ps-sum .bad{background:#fdecec;color:#9b1c1c}.ps-sum .nv{background:#f3efe8;color:#6f6158}
+.ps-h{font-size:.95rem;margin:14px 0 6px;color:#4a0a12}
+.ps-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-radius:10px;background:#fff7f6;border:1px solid #f3c1c1;margin-bottom:6px}
+.ps-row span{color:#9b1c1c;font-size:.85rem}.ps-row .pl,.ps-chips .pl{color:#7a6650;font-size:.78rem}
+.ps-chips{display:flex;gap:6px;flex-wrap:wrap}.ps-chips span{padding:4px 10px;border-radius:999px;background:#f3efe8;font-size:.85rem}
+.ps-chips.ok span{background:#e9f7ef;color:#1f7a45}
