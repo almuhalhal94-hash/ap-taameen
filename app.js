@@ -282,7 +282,7 @@
 
   // ---------------- العدّ من السجل ----------------
   // معلمو التربية الإسلامية: 3 حصص تأمين بالأسبوع كحد أقصى
-  const ISL_DEPT = 'التربية الإسلامية', ISL_WEEK_CAP = 3;
+  const ISL_DEPT = 'التربية الإسلامية', ISL_WEEK_SOFT = 2, SUP_WEEK_CAP = 1; // الإسلامية: فوق حصتين بالأسبوع للضرورة · المشرف: حصة وحدة بالأسبوع
   function weekCovers(iso) {
     const d = parseISO(iso), sun = new Date(d); sun.setDate(d.getDate() - d.getDay());
     const days = [0, 1, 2, 3, 4].map(i => { const x = new Date(sun); x.setDate(sun.getDate() + i); return isoOf(x); }).filter(x => x !== iso);
@@ -390,9 +390,12 @@
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const manS = new Set(db.settings.manualOnly || []), coS = new Set(db.settings.coords || []);
     const peRow = PE().has(row.absent);
-    // التربية الإسلامية: ما يتعدى 3 حصص تأمين بالأسبوع (يشمل تأمينات اليوم)
-    if (!isB) { const wk = weekCovers(date), today = {}; rows.forEach(r => { if (r !== row && r.sub && !BREAKS.has(r.slot)) today[r.sub] = (today[r.sub] || 0) + 1; });
-      for (let i = list.length - 1; i >= 0; i--) { const t = list[i]; if (t.dept === ISL_DEPT && (wk[t.id] || 0) + (today[t.id] || 0) >= ISL_WEEK_CAP) list.splice(i, 1); } }
+    // تأمينات الأسبوع (الأحد–الخميس) + اليوم
+    const wk = weekCovers(date), tdy = {};
+    rows.forEach(r => { if (r !== row && r.sub && !BREAKS.has(r.slot)) tdy[r.sub] = (tdy[r.sub] || 0) + 1; });
+    const wkN = id => (wk[id] || 0) + (tdy[id] || 0);
+    // المشرفون: تأمين واحد بالأسبوع كحد أقصى (وفي صفوف إشرافهم فقط)
+    if (!isB) for (let i = list.length - 1; i >= 0; i--) if (supOf(list[i].id).length && wkN(list[i].id) >= SUP_WEEK_CAP) list.splice(i, 1);
     // غياب معلم رياضة: يغطيه معلمو الرياضة بس (تلقائي) — وغير الرياضة ما يدخل عنهم
     if (peRow) for (let i = list.length - 1; i >= 0; i--) if (!PE().has(list[i].id)) list.splice(i, 1);
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
@@ -401,7 +404,7 @@
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
       const run = runAfter(ctx, t.id, s, extra[t.id] || []);
       const nAll = all[t.id] || 0;
-      const man = manS.has(t.id) && !peRow, co = coS.has(t.id), heavy = (t.total || 0) >= HEAVY, dh = load + nAll >= DAY_HEAVY, coord = co || heavy || dh;
+      const man = manS.has(t.id) && !peRow, co = coS.has(t.id), heavy = (t.total || 0) >= HEAVY, dh = load + nAll >= DAY_HEAVY, isl = !isB && t.dept === ISL_DEPT && wkN(t.id) >= ISL_WEEK_SOFT, coord = co || heavy || dh || isl;
       if (isB) {
         // بديل المراقبة: ما يكون عنده حصة قبل الفسحة أو بعدها مباشرة، ثم معلمو المراقبة، والأخف نصابًا، وواحدة باليوم
         const i = SLOT_ORDER.indexOf(s), nb = [SLOT_ORDER[i - 1], SLOT_ORDER[i + 1]].filter(Boolean);
@@ -409,12 +412,12 @@
         const adjS = nb.filter(x => ex.includes(x) || (ctx.cell(t.id, x) && !NON_TEACHING.has(ctx.cell(t.id, x).t)));
         const adj = adjS.length;
         const over = n >= 1 || nAll >= db.settings.maxPerDay, duty = DUTY_T.has(t.id), consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, man, coord, co, heavy, dh, swp: inSwap.has(t.id), key: [man ? 1 : 0, dh ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
+        return { t, h, n, nAll, same, load, run, over, duty, adj, adjS, man, coord, co, heavy, dh, isl, wkn: wkN(t.id), swp: inSwap.has(t.id), key: [man ? 1 : 0, dh ? 1 : 0, isl ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, adj, consec, duty ? 0 : 1, load, t.teaching, hist.duty[t.id] || 0, h] };
       }
       const over = n >= db.settings.maxPerDay || nAll >= db.settings.maxPerDay;
       const deptTier = db.settings.deptFirst && same && h - minHist <= 2 ? 0 : 1;
       const consec = db.settings.avoidConsec && run >= 4 ? 1 : 0;
-      return { t, h, n, nAll, same, load, run, over, man, coord, co, heavy, dh, swp: inSwap.has(t.id), key: [man ? 1 : 0, dh ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, coord && !same ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
+      return { t, h, n, nAll, same, load, run, over, man, coord, co, heavy, dh, isl, wkn: wkN(t.id), swp: inSwap.has(t.id), key: [man ? 1 : 0, dh ? 1 : 0, isl ? 1 : 0, over ? 1 : 0, coord ? 1 : 0, coord && !same ? 1 : 0, nAll, inSwap.has(t.id) ? 1 : 0, consec, deptTier, h, load, t.total] };
     }).sort((a, b) => sortKey(a.key, b.key) || a.t.name.localeCompare(b.t.name, 'ar'));
   }
 
@@ -541,7 +544,7 @@
   }
   // ملاحظة المرشّح بكلام بسيط
   const candNote = (c, r) => [c.same ? 'نفس القسم' : c.t.dept, c.h ? `أمّن سابقًا ${arNum(c.h)} ${c.h > 2 ? 'مرات' : 'مرة'}` : 'ما أمّن سابقًا', `نصابه اليوم ${arNum(c.load)} ${c.load > 2 && c.load < 11 ? 'حصص' : 'حصة'}`, c.swp ? 'عنده تبديل اليوم' : ''].filter(Boolean).join('، ');
-  const candWarn = (c, r, all) => [all && c.man ? 'معلم رياضة — اختيار يدوي من الإدارة' : '', c.co ? 'منسق القسم — للضرورة فقط' : '', c.dh ? `عنده ${arNum(c.load + c.nAll)} حصص اليوم — للضرورة` : '', c.heavy && !c.co && !c.dh ? `نصابه ${arNum(c.t.total)} حصة — للضرورة فقط` : '', c.coord && !c.same && !BREAKS.has(r.slot) ? 'من خارج قسمه' : '', c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
+  const candWarn = (c, r, all) => [all && c.man ? 'معلم رياضة — اختيار يدوي من الإدارة' : '', c.co ? 'منسق القسم — للضرورة فقط' : '', c.dh ? `عنده ${arNum(c.load + c.nAll)} حصص اليوم — للضرورة` : '', c.isl ? `أمّن ${arNum(c.wkn)} حصص هذا الأسبوع — للضرورة` : '', c.heavy && !c.co && !c.dh ? `نصابه ${arNum(c.t.total)} حصة — للضرورة فقط` : '', c.coord && !c.same && !BREAKS.has(r.slot) ? 'من خارج قسمه' : '', c.over ? `${c.nAll ? 'تأمين ثانٍ اليوم' : 'مراقبة ثانية'} — للضرورة فقط` : '', c.adj ? `عنده حصة ${c.adjS.map(x => slotIdx(x) < slotIdx(r.slot) ? 'قبل' : 'بعد').join(' و')} الفسحة` : '', all && c.run >= 4 ? `${arNum(c.run)} حصص متتالية` : ''].filter(Boolean);
   function rowInfo(r, i, hist, ctx) {
     const cands = candidates(r, state.rows, hist, ctx);
     const cur = cands.find(c => c.t.id === r.sub);
@@ -899,7 +902,8 @@
       <div class="rule"><i class="r-co">⚠</i><div><b>المنسقون والمعلمون الأوائل — للضرورة فقط</b><small>يُجرَّب كل المعلمين قبلهم، ولو اضطر البرنامج يعطيهم تطلع علامة برتقالية</small><div class="rns">${names([...co])}</div></div></div>
       <div class="rule"><i class="r-co">📚</i><div><b>أصحاب النصاب العالي (19 و20 حصة) — للضرورة فقط، ومن قسمهم</b><small>ما يأمّنون إلا إذا ما فيه غيرهم، وإذا اضطر البرنامج يختار من نفس قسم الغائب أول، ومن خارج القسم آخر شي مع تنبيه</small><div class="rns">${names(T.filter(t => (t.total || 0) >= HEAVY && !NO_COVER.has(t.id) && !(db.settings.manualOnly || []).includes(t.id)).map(t => t.id))}</div></div></div>
       <div class="rule"><i class="r-co">④</i><div><b>عنده 4 حصص فأكثر في نفس اليوم — للضرورة فقط</b><small>ما يأمّن إلا إذا ما فيه غيره، وتطلع علامة برتقالية، ويطلب البرنامج تأكيد المدير المساعد عند اختياره وقبل الإرسال</small></div></div>
-      <div class="rule"><i class="r-co">٣</i><div><b>معلمو التربية الإسلامية — 3 حصص تأمين بالأسبوع كحد أقصى</b><small>بعد ما يكمل المعلم 3 حصص تأمين في الأسبوع (الأحد–الخميس) ما ينختار لا تلقائي ولا يدوي لين الأسبوع الجاي</small></div></div>
+      <div class="rule"><i class="r-co">٢</i><div><b>معلمو التربية الإسلامية — حصتين تأمين بالأسبوع، وفوقها للضرورة فقط</b><small>بعد حصتين في الأسبوع (الأحد–الخميس) ما ينختار إلا إذا ما فيه غيره، مع علامة برتقالية</small></div></div>
+      <div class="rule"><i class="r-sup">١</i><div><b>المشرفون — تأمين واحد بالأسبوع كحد أقصى</b><small>وفي صفوف إشرافهم فقط؛ بعد التأمين الأول ما ينختارون لين الأسبوع الجاي</small></div></div>
       <div class="rule"><i class="r-sup">👁</i><div><b>المشرفون — صفوف إشرافهم فقط</b><small>ما يأمّنون إلا صفوف المراحل اللي يشرفون عليها (وتتعدّل من «المعلمون»)</small><div class="rns">${sups.map(id => `<span class="rn">${esc(nm(id).replace(/^أ\.\s*/, ''))} <small>${esc(supLabel(id))}</small></span>`).join('') || '<span class="muted">لا أحد</span>'}</div></div></div>
       <div class="rule"><i class="r-gen">١</i><div><b>تأمين واحد باليوم للمعلم</b><small>الثاني للضرورة فقط مع تنبيه، والثالث ممنوع نهائيًا (يروح للإدارة)</small></div></div>
       <div class="rule"><i class="r-gen">☕</i><div><b>مراقبة الفسحة</b><small>ما تُعطى لمن عنده حصة قبل الفسحة أو بعدها مباشرة</small></div></div>
