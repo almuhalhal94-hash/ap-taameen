@@ -308,7 +308,6 @@
     const opts = [];
     for (const b of T) {
       if (b.id === a || !presentOn(b, ctx.d) || ctx.absentSet.has(b.id)) continue;
-      if (PE().has(a) !== PE().has(b.id)) continue; // الرياضة يبدّلون مع بعض بس
       const ivS = ivOf(it.s, it.c);
       if (ctx.busyIv(b.id, ivS) || ctx.isOutIv(b.id, ivS)) continue; // البديل لازم يكون فاضي وقت حصة صاحب الطلب
       for (const s2 of TEACH_SLOTS) {
