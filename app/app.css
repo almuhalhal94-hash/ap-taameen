@@ -293,3 +293,18 @@ button,a,[data-p]{touch-action:manipulation}
 .pb-chip{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface2);color:var(--ink);font:inherit;font-size:.85rem;font-weight:700;cursor:pointer}
 .pb-chip i{font-style:normal}.pb-chip small{font-weight:400;color:var(--muted)}
 .pb-chip.on{border-color:#e2b45a;background:rgba(226,180,90,.18);color:#f6d690}
+/* أكثر من تكليف: جنب بعض */
+.multi{margin:10px -16px 4px}
+.multi-head{padding:0 16px 8px}.multi-head b{display:block;color:#f6d690;font-size:1.05rem}.multi-head small{color:var(--muted);font-size:.82rem}
+.multi-row{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 16px 12px;-webkit-overflow-scrolling:touch}
+.mcard{flex:0 0 84%;scroll-snap-align:center;display:flex;flex-direction:column;gap:10px}
+.mcard .card{position:relative!important;inset:auto!important;transform:none!important;height:auto;min-height:300px}
+.m-acts{display:flex;gap:10px;justify-content:center}
+.m-acts .act{flex:1;flex-direction:row;gap:8px;padding:10px;font-size:.88rem}
+.m-acts .act span{width:30px;height:30px;font-size:1rem}
+.m-n{text-align:center;color:var(--muted);font-size:.78rem}
+.m-acts .act{border-radius:14px;padding:12px 8px;font-weight:800;font-size:.92rem;justify-content:center;align-items:center}
+.m-acts .act span{display:none}
+.m-acts .act.yes{background:linear-gradient(135deg,#2fbf7a,#1f8f4e);color:#fff}
+.m-acts .act.no{background:transparent;border:1.5px solid rgba(255,120,110,.7);color:#ffb4a8}
+.m-acts .act.yes:before{content:"✓ "}.m-acts .act.no:before{content:"! "}

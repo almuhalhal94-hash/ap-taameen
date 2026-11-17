@@ -255,8 +255,23 @@
   function renderTasks() {
     let pend = mine.filter(d => d.status === 'pending');
     if (focusId && pend.some(d => d.id === focusId)) pend = [pend.find(d => d.id === focusId), ...pend.filter(d => d.id !== focusId)];
-    renderPendBar(pend);
     setNb('#nbTasks', pend.length);
+    // أكثر من تكليف: البطاقات جنب بعض، وكل بطاقة لها أزرارها
+    const multi = $('#multi'), sw = $('.stack-wrap');
+    if (pend.length >= 2) {
+      $('#pendBar').hidden = true; sw.hidden = true; multi.hidden = false;
+      const sig = JSON.stringify(pend);
+      if (multi.dataset.sig !== sig) {
+        multi.dataset.sig = sig;
+        multi.innerHTML = `<div class="multi-head"><b>عندك ${pend.length === 2 ? 'تكليفان' : pend.length + ' تكليفات'}</b><small>مرّر يمين ويسار — كل تكليف له استلام مستقل</small></div>
+          <div class="multi-row">${pend.map((d, i) => `<div class="mcard"><div class="card k-${d.kind}" data-id="${esc(d.id)}">${cardHTML(d)}</div>
+            <div class="m-acts"><button class="act no" data-mact="no" data-mid="${esc(d.id)}"><span>!</span>عندي عذر رسمي</button><button class="act yes" data-mact="yes" data-mid="${esc(d.id)}"><span>✓</span>استلمت</button></div>
+            <div class="m-n">${i + 1} من ${pend.length}</div></div>`).join('')}</div>`;
+      }
+      $('#emptyTasks').hidden = true; renderDone(); return;
+    }
+    multi.hidden = true; multi.dataset.sig = ''; sw.hidden = false;
+    renderPendBar(pend);
     const stack = $('#stack'), ids = pend.slice(0, 3).map(d => d.id);
     [...stack.children].forEach(el => { if (!ids.includes(el.dataset.id) && !el.classList.contains('leaving')) el.remove(); });
     ids.slice().reverse().forEach((id, ri) => {
@@ -365,6 +380,7 @@
   }
   $('#btnYes').addEventListener('click', () => { const el = $('#stack .card.top'); if (el) decide(el, 'yes'); });
   $('#btnNo').addEventListener('click', () => { const el = $('#stack .card.top'); if (el) decide(el, 'no'); });
+  $('#multi').addEventListener('click', e => { const b = e.target.closest('[data-mact]'); if (!b) return; const el = $(`#multi .card[data-id="${CSS.escape(b.dataset.mid)}"]`); if (el) decide(el, b.dataset.mact); });
 
   // ---------- المشرف: المتابعة (بدون تفاصيل الاعتذار) ----------
   if (SUP) {
