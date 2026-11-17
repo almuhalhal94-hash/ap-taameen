@@ -308,6 +308,7 @@
     const opts = [];
     for (const b of T) {
       if (b.id === a || !presentOn(b, ctx.d) || ctx.absentSet.has(b.id)) continue;
+      if (PE().has(a) !== PE().has(b.id)) continue; // الرياضة يبدّلون مع بعض بس
       const ivS = ivOf(it.s, it.c);
       if (ctx.busyIv(b.id, ivS) || ctx.isOutIv(b.id, ivS)) continue; // البديل لازم يكون فاضي وقت حصة صاحب الطلب
       for (const s2 of TEACH_SLOTS) {
@@ -366,6 +367,7 @@
     return best;
   }
 
+  const PE = () => new Set(T.filter(t => t.dept === 'التربية الرياضية').map(t => t.id));
   const HEAVY = 19, DAY_HEAVY = 4; // 4 حصص فأكثر في نفس اليوم = للضرورة مع تنبيه للمدير المساعد
   function candidates(row, rows, hist, ctx) {
     const s = row.slot, iv = ivOf(s, row.c);
@@ -379,13 +381,16 @@
     const list = T.filter(t => !NO_COVER.has(t.id) && (all[t.id] || 0) < CAP && presentOn(t, ctx.d) && !ctx.absentSet.has(t.id) && !ctx.isOutIv(t.id, iv) && !ctx.busyIv(t.id, iv) && !taken.has(t.id) && !(row.refused || []).includes(t.id) && supAllows(t.id, row.c, s));
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const manS = new Set(db.settings.manualOnly || []), coS = new Set(db.settings.coords || []);
+    const peRow = PE().has(row.absent);
+    // غياب معلم رياضة: يغطيه معلمو الرياضة بس (تلقائي) — وغير الرياضة ما يدخل عنهم
+    if (peRow) for (let i = list.length - 1; i >= 0; i--) if (!PE().has(list[i].id)) list.splice(i, 1);
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
     return list.map(t => {
       const h = hist.cnt[t.id] || 0, n = tc[t.id] || 0, same = t.dept === absT.dept;
       const load = dayCells(ctx, t.id).filter(x => !NON_TEACHING.has(x.cell.t)).length;
       const run = runAfter(ctx, t.id, s, extra[t.id] || []);
       const nAll = all[t.id] || 0;
-      const man = manS.has(t.id), co = coS.has(t.id), heavy = (t.total || 0) >= HEAVY, dh = load + nAll >= DAY_HEAVY, coord = co || heavy || dh;
+      const man = manS.has(t.id) && !peRow, co = coS.has(t.id), heavy = (t.total || 0) >= HEAVY, dh = load + nAll >= DAY_HEAVY, coord = co || heavy || dh;
       if (isB) {
         // بديل المراقبة: ما يكون عنده حصة قبل الفسحة أو بعدها مباشرة، ثم معلمو المراقبة، والأخف نصابًا، وواحدة باليوم
         const i = SLOT_ORDER.indexOf(s), nb = [SLOT_ORDER[i - 1], SLOT_ORDER[i + 1]].filter(Boolean);
