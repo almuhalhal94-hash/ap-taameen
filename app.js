@@ -281,6 +281,15 @@
   const coverable = cell => !NON_TEACHING.has(cell.t) || (cell.t === 'مراقبة' && db.settings.coverBreak);
 
   // ---------------- العدّ من السجل ----------------
+  // معلمو التربية الإسلامية: 3 حصص تأمين بالأسبوع كحد أقصى
+  const ISL_DEPT = 'التربية الإسلامية', ISL_WEEK_CAP = 3;
+  function weekCovers(iso) {
+    const d = parseISO(iso), sun = new Date(d); sun.setDate(d.getDate() - d.getDay());
+    const days = [0, 1, 2, 3, 4].map(i => { const x = new Date(sun); x.setDate(sun.getDate() + i); return isoOf(x); }).filter(x => x !== iso);
+    const c = {};
+    days.forEach(x => (db.history[x] && db.history[x].rows || []).forEach(r => { if (r.sub && !isE(r.sub) && !BREAKS.has(r.slot)) c[r.sub] = (c[r.sub] || 0) + 1; }));
+    return c;
+  }
   function historyCounts(excludeDate) {
     const cnt = {}, abs = {}, last = {}, swA = {}, swB = {}, ref = {}, duty = {};
     let emg = 0;
@@ -381,6 +390,9 @@
     const inSwap = new Set(state.swaps.flatMap(sw => [sw.a, ...sw.items.map(it => it.b)]).filter(Boolean));
     const manS = new Set(db.settings.manualOnly || []), coS = new Set(db.settings.coords || []);
     const peRow = PE().has(row.absent);
+    // التربية الإسلامية: ما يتعدى 3 حصص تأمين بالأسبوع (يشمل تأمينات اليوم)
+    if (!isB) { const wk = weekCovers(date), today = {}; rows.forEach(r => { if (r !== row && r.sub && !BREAKS.has(r.slot)) today[r.sub] = (today[r.sub] || 0) + 1; });
+      for (let i = list.length - 1; i >= 0; i--) { const t = list[i]; if (t.dept === ISL_DEPT && (wk[t.id] || 0) + (today[t.id] || 0) >= ISL_WEEK_CAP) list.splice(i, 1); } }
     // غياب معلم رياضة: يغطيه معلمو الرياضة بس (تلقائي) — وغير الرياضة ما يدخل عنهم
     if (peRow) for (let i = list.length - 1; i >= 0; i--) if (!PE().has(list[i].id)) list.splice(i, 1);
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
@@ -887,6 +899,7 @@
       <div class="rule"><i class="r-co">⚠</i><div><b>المنسقون والمعلمون الأوائل — للضرورة فقط</b><small>يُجرَّب كل المعلمين قبلهم، ولو اضطر البرنامج يعطيهم تطلع علامة برتقالية</small><div class="rns">${names([...co])}</div></div></div>
       <div class="rule"><i class="r-co">📚</i><div><b>أصحاب النصاب العالي (19 و20 حصة) — للضرورة فقط، ومن قسمهم</b><small>ما يأمّنون إلا إذا ما فيه غيرهم، وإذا اضطر البرنامج يختار من نفس قسم الغائب أول، ومن خارج القسم آخر شي مع تنبيه</small><div class="rns">${names(T.filter(t => (t.total || 0) >= HEAVY && !NO_COVER.has(t.id) && !(db.settings.manualOnly || []).includes(t.id)).map(t => t.id))}</div></div></div>
       <div class="rule"><i class="r-co">④</i><div><b>عنده 4 حصص فأكثر في نفس اليوم — للضرورة فقط</b><small>ما يأمّن إلا إذا ما فيه غيره، وتطلع علامة برتقالية، ويطلب البرنامج تأكيد المدير المساعد عند اختياره وقبل الإرسال</small></div></div>
+      <div class="rule"><i class="r-co">٣</i><div><b>معلمو التربية الإسلامية — 3 حصص تأمين بالأسبوع كحد أقصى</b><small>بعد ما يكمل المعلم 3 حصص تأمين في الأسبوع (الأحد–الخميس) ما ينختار لا تلقائي ولا يدوي لين الأسبوع الجاي</small></div></div>
       <div class="rule"><i class="r-sup">👁</i><div><b>المشرفون — صفوف إشرافهم فقط</b><small>ما يأمّنون إلا صفوف المراحل اللي يشرفون عليها (وتتعدّل من «المعلمون»)</small><div class="rns">${sups.map(id => `<span class="rn">${esc(nm(id).replace(/^أ\.\s*/, ''))} <small>${esc(supLabel(id))}</small></span>`).join('') || '<span class="muted">لا أحد</span>'}</div></div></div>
       <div class="rule"><i class="r-gen">١</i><div><b>تأمين واحد باليوم للمعلم</b><small>الثاني للضرورة فقط مع تنبيه، والثالث ممنوع نهائيًا (يروح للإدارة)</small></div></div>
       <div class="rule"><i class="r-gen">☕</i><div><b>مراقبة الفسحة</b><small>ما تُعطى لمن عنده حصة قبل الفسحة أو بعدها مباشرة</small></div></div>
