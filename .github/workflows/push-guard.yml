@@ -2,9 +2,9 @@ name: حارس إشعارات المعلمين
 # يراقب السحابة لحظيًا ويرسل إشعار لكل معلم (تأمين، تبديل، تحديث، إلغاء، تذكير، رسائل الإدارة)
 # يشتغل على مدار الساعة: كل تشغيلة (~5:45 ساعة) تشغّل اللي بعدها بنفسها. الجدول تحت احتياط فقط لو انقطعت السلسلة.
 # الكود في فرع العمل: tools/push
+# موقوف: المستودع خاص ودقائق GitHub المجانية (2000/شهر) ما تكفي حارس على مدار الساعة.
+# يشتغل بس يدويًا (workflow_dispatch) لين نلقى بديل.
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,5 +25,4 @@ jobs:
       - run: node tools/push/guard.mjs
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
