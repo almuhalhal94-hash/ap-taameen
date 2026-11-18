@@ -471,7 +471,7 @@
       const st = ST[q.status] || ST.pending;
       const res = q.status === 'approved' && (q.result || []).length ? `<div class="s rq-res">${q.result.map(x => `<span class="${x.ok ? '' : 'rq-warn'}">${x.ok ? (q.type === 'absreq' ? '✓' : '⇄') : '⚠'} ${esc(x.txt)}</span>`).join('<br>')}</div>` : '';
       return `<div class="item rq rq-${st[0]}"><span class="dot ${st[0] === 'bad' ? 'bad' : ''}"></span><div class="grow"><div class="t">${q.type === 'absreq' ? 'طلب تأمين حصص (غياب بعذر رسمي)' : 'طلب تبديل'} — ${esc(reqDay(q))}</div>
-        <div class="s">الحصص: ${q.full ? 'اليوم كامل' : q.slots.map(k => perName(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '')).join('، ')} · ${q.type === 'absreq' ? 'العذر: ' + esc(q.kindTxt || '') + (q.reason ? ' — ' + esc(q.reason) : '') : 'السبب: ' + esc(q.reason)}</div>${res}${q.adminNote ? `<div class="s rq-note">الإدارة: ${esc(q.adminNote)}</div>` : ''}</div>
+        <div class="s">الحصص: ${q.full ? 'اليوم كامل' : q.slots.map(k => perName(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '') + (q.want && q.want[k] ? ` ← بدالها ${perName(q.want[k])}` : '')).join('، ')} · ${q.type === 'absreq' ? 'العذر: ' + esc(q.kindTxt || '') + (q.reason ? ' — ' + esc(q.reason) : '') : 'السبب: ' + esc(q.reason)}</div>${res}${q.adminNote ? `<div class="s rq-note">الإدارة: ${esc(q.adminNote)}</div>` : ''}</div>
         <div class="side"><span class="tag ${st[0] === 'ok' ? 'ok' : ''}">${st[1]}</span>${q.status === 'pending' ? `<button class="mini" data-rq-cancel="${q.id}">إلغاء الطلب</button>` : ''}</div></div>`;
     }).join('');
   }
@@ -479,12 +479,13 @@
     SND('tap');
     const tm = new Date(); tm.setDate(tm.getDate() + 1);
     const def = tm.getDay() === 5 ? isoOf(new Date(tm.getTime() + 2 * 864e5)) : tm.getDay() === 6 ? isoOf(new Date(tm.getTime() + 864e5)) : isoOf(tm);
-    const picked = new Set();
+    const picked = new Set(), want = {};
     const v = await sheet(`<div class="sh-ic">⇄</div><h3>طلب تبديل حصة</h3>
       <p class="sh-sum">اختر اليوم والحصص اللي تبي تبدّلها. الإدارة ترتّب لك زميلًا يدرّس <b>نفس الصف</b>: يدخل حصتك، وتدخل أنت حصته في وقت ثاني من نفس اليوم.</p>
       <p class="lbl">اليوم <span class="req">*</span></p><input type="date" id="rqDate" class="rq-in" min="${TODAY}" value="${def}"><p class="rq-sel" id="rqDay"></p>
       <p class="lbl">حصصك في هذا اليوم <span class="req">*</span> <small class="muted">— اضغط الحصة اللي تبي تبدّلها</small></p><div class="rq-per" id="rqPer"></div>
       <p class="rq-sel" id="rqSel">ما اخترت حصة بعد</p>
+      <div id="rqWant" class="rq-want"></div>
       <p class="lbl">السبب <span class="req">*</span></p><textarea id="rqWhy" rows="2" placeholder="مثال: موعد رسمي، ظرف عائلي…"></textarea>
       <p class="lbl">زميل تقترحه <small class="muted">(اختياري)</small></p><input id="rqWho" class="rq-in" placeholder="اسم الزميل إن اتفقت معه">
       <p class="err" id="rqErr"></p>
@@ -494,7 +495,8 @@
         const err = !date || date < TODAY ? 'اختر يومًا من اليوم فما بعد.' : !picked.size ? 'اختر حصة وحدة على الأقل.' : reason.length < 3 ? 'اكتب سبب الطلب.' : '';
         if (err) { $('#rqErr').textContent = err; buzz(30); return false; }
         const cls = {}; $('#rqPer').querySelectorAll('[data-p][data-c]').forEach(x => { if (picked.has(x.dataset.p)) cls[x.dataset.p] = x.dataset.c; });
-        return { date, reason, slots: [...picked].sort(), cls, prefer: $('#rqWho').value.trim() };
+        const w = {}; [...picked].forEach(k => { if (want[k]) w[k] = want[k]; });
+        return { date, reason, slots: [...picked].sort(), cls, prefer: $('#rqWho').value.trim(), want: w };
       }
     }, () => {
       const dayTxt = () => { const v = $('#rqDate').value; $('#rqDay').innerHTML = v ? `يوم <b>${weekdayAr(v)}</b> ${new Intl.DateTimeFormat('ar', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(v + 'T12:00'))}` : ''; };
@@ -511,11 +513,18 @@
       };
       $('#rqDate').oninput = $('#rqDate').onchange = () => { dayTxt(); drawPer(); }; dayTxt();
       let lastT = 0, lastP = '';
+      // الحصص اللي المعلم فاضي فيها ذاك اليوم (يقدر يختار وحدة منها يدخلها بدال حصته)
+      const freeDay = v => { if (!v || !myT) return []; const [y, m, dd] = v.split('-').map(Number); const wd = new Date(y, m - 1, dd).getDay(); if (wd > 4) return []; return Object.keys(PER).filter(k => !myT.cells[wd + '-' + k]); };
       const paint = () => {
         $('#rqPer').querySelectorAll('[data-p]').forEach(x => { const on = picked.has(x.dataset.p); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); });
         const l = [...picked].sort().map(perName);
         $('#rqSel').innerHTML = l.length ? `اخترت ${l.length === 1 ? 'حصة' : l.length === 2 ? 'حصتين' : l.length + ' حصص'}: <b>${l.join('، ')}</b>` : 'ما اخترت حصة بعد';
+        const fr = freeDay($('#rqDate').value);
+        Object.keys(want).forEach(k => { if (!picked.has(k) || !fr.includes(want[k])) delete want[k]; });
+        const used = k => Object.entries(want).some(([a, b]) => b === k && a);
+        $('#rqWant').innerHTML = !picked.size ? '' : `<p class="lbl">وش الحصة اللي تبي تدخلها بدالها؟ <small class="muted">(اختياري)</small></p>` + [...picked].sort().map(k => `<div class="rw-row"><b>بدل ${perName(k)}:</b><div class="rw-ch"><button type="button" data-w="${k}" data-v="" class="${!want[k] ? 'on' : ''}">أي حصة تناسب</button>${fr.map(f => `<button type="button" data-w="${k}" data-v="${f}" class="${want[k] === f ? 'on' : ''}" ${want[k] !== f && used(f) ? 'disabled' : ''}>${perName(f)}</button>`).join('')}</div></div>`).join('') + (fr.length ? '' : '<p class="rq-none">ما عندك حصص فاضية في هذا اليوم.</p>');
       };
+      $('#rqWant').onclick = e => { const b = e.target.closest('[data-w]'); if (!b || b.disabled) return; e.preventDefault(); SND('tap'); if (b.dataset.v) want[b.dataset.w] = b.dataset.v; else delete want[b.dataset.w]; paint(); };
       $('#rqPer').onclick = e => {
         const b = e.target.closest('[data-p]'); if (!b) return;
         e.preventDefault(); e.stopPropagation();

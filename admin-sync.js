@@ -398,7 +398,7 @@
     const ST = { pending: ['act', '⏳ بانتظار قرارك'], approved: ['ok', ab ? '✓ اعتُمد وسُجّل الغياب' : '✓ تمت الموافقة'], declined: ['none', '✕ ما اعتُمد'] };
     const st = ST[q.status] || ST.pending;
     const res = (q.result || []).map(x => `<div class="rnote ${x.ok ? '' : 'adm'}">${x.ok ? (ab ? '✓' : '⇄') : '⚠'} ${esc(x.txt)}</div>`).join('');
-    const per = q.full ? 'اليوم كامل' : q.slots.map(k => PER(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '')).join('، ');
+    const per = q.full ? 'اليوم كامل' : q.slots.map(k => PER(k) + (q.cls && q.cls[k] ? ` (${code(q.cls[k])})` : '') + (q.want && q.want[k] ? ` ← يبي يدخل بدالها ${PER(q.want[k])}` : '')).join('، ');
     const btns = q.status !== 'pending' ? '' : ab
       ? `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-ab-ok="${q.id}">✓ اعتماد وتوزيع حصصه</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>`
       : `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-rq-auto="${q.id}">⚡ تبديل تلقائي</button><button class="btn sm" data-rq-manual="${q.id}">✋ أرتبه بنفسي</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>`;
@@ -427,7 +427,7 @@
   async function reqAuto(id) {
     const q = reqs.find(x => x.id === id); if (!q) return;
     if (!(await A.ask(`ترتيب تبديل تلقائي لـ ${q.name} يوم ${A.weekdayName(q.date)} ${A.fmtG(q.date)} (الحصص: ${q.slots.map(PER).join('، ')})؟`, 'رتّب التبديل'))) return;
-    const r = A.swapRequest(q.date, q.tid, q.slots, q.reason, q.prefer);
+    const r = A.swapRequest(q.date, q.tid, q.slots, q.reason, q.prefer, q.want || {});
     if (r.err) { A.toast(r.err); await A.ask(r.err + '\n\nتقدر ترتبه بنفسك من «التبديل والاستئذان» أو تعتذر عن الطلب.', 'حسنًا'); return; }
     const result = r.result.concat(r.skipped.length ? [{ ok: false, txt: `الحصص ${r.skipped.join('، ')}: ما عندك فيها حصة تدريس` }] : []);
     await S.set('msgs/' + id, { status: 'approved', result, decidedAt: now(), readT: false });

@@ -308,3 +308,8 @@ button,a,[data-p]{touch-action:manipulation}
 .m-acts .act.yes{background:linear-gradient(135deg,#2fbf7a,#1f8f4e);color:#fff}
 .m-acts .act.no{background:transparent;border:1.5px solid rgba(255,120,110,.7);color:#ffb4a8}
 .m-acts .act.yes:before{content:"✓ "}.m-acts .act.no:before{content:"! "}
+.rq-want .rw-row{margin:6px 0 8px}.rq-want .rw-row b{display:block;font-size:.85rem;margin-bottom:5px;color:#f6d690}
+.rw-ch{display:flex;gap:6px;flex-wrap:wrap}
+.rw-ch button{padding:7px 11px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface2);color:var(--ink);font:inherit;font-size:.82rem;cursor:pointer}
+.rw-ch button.on{border-color:#e2b45a;background:rgba(226,180,90,.18);color:#f6d690;font-weight:700}
+.rw-ch button:disabled{opacity:.35}

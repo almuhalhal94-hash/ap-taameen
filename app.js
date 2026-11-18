@@ -1133,7 +1133,7 @@
     // البدلاء بالترتيب لصف تأمين (بدون اللي عندهم الحد اليومي)
     ranked(row) { return candidates(row, state.rows, historyCounts(date), context()).filter(c => !c.man).map(c => c.t.id); },
     // طلب تبديل من معلم (من التطبيق): يرتّبه تلقائيًا بنفس قواعد التبديل، ويفضّل الزميل المقترح إن أمكن
-    swapRequest(iso, a, slots, reason, prefer) {
+    swapRequest(iso, a, slots, reason, prefer, want) {
       if (iso !== date) { $('#dateInput').value = iso; swDraft = newDraft(); loadDate(iso); }
       if (D() === -1) return { err: 'هذا اليوم ما فيه دوام.' };
       if (state.swaps.some(x => x.a === a)) return { err: `${nm(a)} عنده تبديل مسجّل في هذا اليوم — عدّله من «التبديل والاستئذان».` };
@@ -1148,12 +1148,15 @@
       const used = new Set();
       for (const it of items) {
         const opts = swapOptions(sw, it, hist).filter(o => !o.covering && !used.has(o.b + '|' + o.s2));
-        const best = (pref && opts.find(o => nm(o.b).includes(pref))) || opts[0];
+        const w = want && want[it.s];
+        // الأولوية: الحصة البديلة اللي اختارها المعلم (ومع الزميل المقترح لو أمكن)
+        const best = (w && pref && opts.find(o => o.s2 === w && nm(o.b).includes(pref))) || (w && opts.find(o => o.s2 === w)) || (pref && opts.find(o => nm(o.b).includes(pref))) || opts[0];
+        if (best && w && best.s2 !== w) it.wantMiss = w;
         if (best) { Object.assign(it, { b: best.b, s2: best.s2, t2: best.t2, m: true, none: false }); used.add(best.b + '|' + best.s2); }
       }
       afterChange();
       const res = sw.items.map(it => it.b
-        ? { ok: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}) يدخلها ${nm(it.b)}، وتدخل أنت حصته ${SLOT_NAME[it.s2]}` }
+        ? { ok: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}) يدخلها ${nm(it.b)}، وتدخل أنت حصته ${SLOT_NAME[it.s2]}${it.wantMiss ? ` (ما تيسّر تبديل في ${SLOT_NAME[it.wantMiss]} اللي طلبتها)` : ''}` }
         : { ok: false, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}): ما فيه زميل متاح للتبديل، وتُغطّى بالتأمين` });
       const skipped = slots.filter(x => !own.includes(x)).map(x => SLOT_NAME[x]);
       return { result: res, skipped };
