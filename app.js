@@ -326,6 +326,8 @@
         const iv2 = ivOf(s2, it.c);
         // «قلب حصتين»: المعلم ما يطلع، يبادل وقت حصتين عنده — فوقت حصته الثانية يعتبر فاضي لأنه بيتبدّل هو بعد
         const vac = sw.reorder ? new Set(sw.items.map(x => x.s)) : null;
+        // الحصص اللي صاحب الطلب داخلها أصلًا بتبديل ثاني في نفس اليوم — ما ينعطى فيها شي ثاني
+        if (state.swaps.some(x => x !== sw && x.a === a && x.items.some(i => i.b && i.s2 === s2))) continue;
         if (!sw.reorder && overlap(iv2, winOf(sw))) continue;          // صاحب الطلب برا المدرسة وقتها
         if ((ctx.busyIv(a, iv2) && !(vac && vac.has(s2))) || ctx.isOutIv(b.id, iv2)) continue; // صاحب الطلب فاضي وقتها
         opts.push({ b: b.id, s2, t2: bc.t, covering: covering.has(b.id), key: [covering.has(b.id) ? 1 : 0, hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
@@ -1138,10 +1140,12 @@
     swapRequest(iso, a, slots, reason, prefer, want) {
       if (iso !== date) { $('#dateInput').value = iso; swDraft = newDraft(); loadDate(iso); }
       if (D() === -1) return { err: 'هذا اليوم ما فيه دوام.' };
-      if (state.swaps.some(x => x.a === a)) return { err: `${nm(a)} عنده تبديل مسجّل في هذا اليوم — عدّله من «التبديل والاستئذان».` };
+      // عنده تبديل من قبل في نفس اليوم؟ الطلب الجديد ينضاف، بس الحصص اللي عليها تبديل ما تتلخبط
+      const before = new Set(state.swaps.filter(x => x.a === a).flatMap(x => x.items.map(i => i.s)));
       const ctx = context();
       if (ctx.absentSet.has(a)) return { err: `${nm(a)} مسجّل غائب في هذا اليوم.` };
-      const own = slots.filter(x => { const c = ctx.cell(a, x); return c && !NON_TEACHING.has(c.t); });
+      const own = slots.filter(x => { const c = ctx.cell(a, x); return c && !NON_TEACHING.has(c.t) && !before.has(x); });
+      if (!own.length && slots.some(x => before.has(x))) return { err: `الحصص المطلوبة (${slots.map(x => SLOT_NAME[x]).join('، ')}) عليها تبديل معتمد من قبل لـ ${nm(a)} — عدّله من «التبديل والاستئذان».` };
       if (!own.length) return { err: `${nm(a)} ما عنده حصص تدريس في الحصص المطلوبة (${slots.map(x => SLOT_NAME[x]).join('، ')}).` };
       const items = own.map(x => { const c = ctx.cell(a, x); return { s: x, c: c.c, t: c.t, b: '', s2: '', t2: '' }; });
       const reorder = Object.entries(want || {}).some(([k, w]) => own.includes(k) && own.includes(w));
@@ -1215,7 +1219,7 @@
       if (iso !== date) return false;
       let changed = false;
       if (key.kind === 'swap') {
-        const sw = state.swaps.find(x => x.a === key.absent); const it = sw && sw.items.find(x => x.s === key.slot);
+        const sw = state.swaps.find(x => x.a === key.absent && x.items.some(i => i.s === key.slot)); const it = sw && sw.items.find(x => x.s === key.slot);
         if (!it) return false;
         if (next && next.b && (it.b !== next.b || it.s2 !== next.s2)) { Object.assign(it, { b: next.b, s2: next.s2, t2: next.t2 || '', m: true, none: false }); changed = true; }
         if (!next && it.b && refused.includes(it.b)) { Object.assign(it, { b: '', s2: '', t2: '', m: false, none: true }); changed = true; }

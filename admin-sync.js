@@ -123,7 +123,7 @@
     for (const d of docs) {
       if (d.status === 'cancelled') continue;
       if (d.kind === 'swap') {
-        const sw = st.swaps.find(x => x.a === d.absent), it = sw && sw.items.find(x => x.s === d.slot);
+        const sw = st.swaps.find(x => x.a === d.absent && x.items.some(i => i.s === d.slot)), it = sw && sw.items.find(x => x.s === d.slot);
         if (it && it.b) it.m = true;
       } else {
         const r = st.rows.find(x => x.absent === d.absent && x.slot === d.slot);
@@ -233,7 +233,7 @@
   // ---------------- تحكم الإدارة الكامل ----------------
   const firstOf = d => d.first || ((d.log || []).find(l => l.tid && l.tid !== 'admin') || {}).tid || d.to;
   const rowOf = d => d.kind === 'swap' ? null : A.state.rows.find(r => r.absent === d.absent && r.slot === d.slot);
-  const swOf = d => { const sw = A.state.swaps.find(x => x.a === d.absent); const it = sw && sw.items.find(x => x.s === d.slot); return sw && it ? [sw, it] : null; };
+  const swOf = d => { const sw = A.state.swaps.find(x => x.a === d.absent && x.items.some(i => i.s === d.slot)); const it = sw && sw.items.find(x => x.s === d.slot); return sw && it ? [sw, it] : null; };
   function choices(d) {
     // المعتذرون أولًا (يقدر يرفض عذرهم ويرجّع لهم التكليف)، بعدها المتاحين بالترتيب
     const out = [], seen = new Set([d.to]);
