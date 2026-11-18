@@ -400,6 +400,8 @@
     const wkN = id => (wk[id] || 0) + (tdy[id] || 0);
     // المشرفون: تأمين واحد بالأسبوع كحد أقصى (وفي صفوف إشرافهم فقط)
     if (!isB) for (let i = list.length - 1; i >= 0; i--) if (supOf(list[i].id).length && wkN(list[i].id) >= SUP_WEEK_CAP) list.splice(i, 1);
+    // 4 حصص في اليوم حد أقصى: اللي عنده 3 (حصصه + تأميناته اليوم) ياخذ الرابعة عادي، واللي عنده 4 ما ياخذ خامسة أبد (طلب المدير المساعد)
+    if (!isB) for (let i = list.length - 1; i >= 0; i--) { const id = list[i].id; if (dayCells(ctx, id).filter(x => !NON_TEACHING.has(x.cell.t)).length + (tdy[id] || 0) >= DAY_HEAVY) list.splice(i, 1); }
     // غياب معلم رياضة: يغطيه معلمو الرياضة بس (تلقائي) — وغير الرياضة ما يدخل عنهم
     if (peRow) for (let i = list.length - 1; i >= 0; i--) if (!PE().has(list[i].id)) list.splice(i, 1);
     const minHist = list.length ? Math.min(...list.map(t => hist.cnt[t.id] || 0)) : 0;
@@ -905,7 +907,7 @@
       <div class="rule"><i class="r-man">✋</i><div><b>يدوي فقط (التربية الرياضية)</b><small>ما ينختارون تلقائيًا ولا بعد اعتذار أحد — الإدارة تختارهم بنفسها من «تغيير» إذا بغت</small><div class="rns">${names([...man])}</div></div></div>
       <div class="rule"><i class="r-co">⚠</i><div><b>المنسقون والمعلمون الأوائل — للضرورة فقط</b><small>يُجرَّب كل المعلمين قبلهم، ولو اضطر البرنامج يعطيهم تطلع علامة برتقالية</small><div class="rns">${names([...co])}</div></div></div>
       <div class="rule"><i class="r-co">📚</i><div><b>أصحاب النصاب العالي (19 و20 حصة) — للضرورة فقط، ومن قسمهم</b><small>ما يأمّنون إلا إذا ما فيه غيرهم، وإذا اضطر البرنامج يختار من نفس قسم الغائب أول، ومن خارج القسم آخر شي مع تنبيه</small><div class="rns">${names(T.filter(t => (t.total || 0) >= HEAVY && !NO_COVER.has(t.id) && !(db.settings.manualOnly || []).includes(t.id)).map(t => t.id))}</div></div></div>
-      <div class="rule"><i class="r-co">④</i><div><b>عنده 4 حصص فأكثر في نفس اليوم — للضرورة فقط</b><small>ما يأمّن إلا إذا ما فيه غيره، وتطلع علامة برتقالية، ويطلب البرنامج تأكيد المدير المساعد عند اختياره وقبل الإرسال</small></div></div>
+      <div class="rule"><i class="r-co">④</i><div><b>4 حصص في اليوم حد أقصى</b><small>اللي عنده 3 حصص ياخذ الرابعة تأمين عادي، واللي عنده 4 حصص (مع تأميناته) ما ياخذ خامسة أبد — لا تلقائي ولا يدوي</small></div></div>
       <div class="rule"><i class="r-co">٢</i><div><b>معلمو التربية الإسلامية — حصتين تأمين بالأسبوع، وفوقها للضرورة فقط</b><small>بعد حصتين في الأسبوع (الأحد–الخميس) ما ينختار إلا إذا ما فيه غيره، مع علامة برتقالية</small></div></div>
       <div class="rule"><i class="r-sup">١</i><div><b>المشرفون — تأمين واحد بالأسبوع كحد أقصى</b><small>وفي صفوف إشرافهم فقط؛ بعد التأمين الأول ما ينختارون لين الأسبوع الجاي</small></div></div>
       <div class="rule"><i class="r-sup">👁</i><div><b>المشرفون — صفوف إشرافهم فقط</b><small>ما يأمّنون إلا صفوف المراحل اللي يشرفون عليها (وتتعدّل من «المعلمون»)</small><div class="rns">${sups.map(id => `<span class="rn">${esc(nm(id).replace(/^أ\.\s*/, ''))} <small>${esc(supLabel(id))}</small></span>`).join('') || '<span class="muted">لا أحد</span>'}</div></div></div>
