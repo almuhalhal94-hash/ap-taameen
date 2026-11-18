@@ -520,11 +520,19 @@
         const l = [...picked].sort().map(perName);
         $('#rqSel').innerHTML = l.length ? `اخترت ${l.length === 1 ? 'حصة' : l.length === 2 ? 'حصتين' : l.length + ' حصص'}: <b>${l.join('، ')}</b>` : 'ما اخترت حصة بعد';
         const fr = freeDay($('#rqDate').value);
-        Object.keys(want).forEach(k => { if (!picked.has(k) || !fr.includes(want[k])) delete want[k]; });
+        // الخيارات: حصصه الفاضية + حصصه الثانية المختارة (قلب حصتين)
+        const optsFor = k => [...fr, ...[...picked].filter(x => x !== k)].sort((a, b) => a - b);
+        Object.keys(want).forEach(k => { if (!picked.has(k) || !optsFor(k).includes(want[k])) delete want[k]; });
         const used = k => Object.entries(want).some(([a, b]) => b === k && a);
-        $('#rqWant').innerHTML = !picked.size ? '' : `<p class="lbl">وش الحصة اللي تبي تدخلها بدالها؟ <small class="muted">(اختياري)</small></p>` + [...picked].sort().map(k => `<div class="rw-row"><b>بدل ${perName(k)}:</b><div class="rw-ch"><button type="button" data-w="${k}" data-v="" class="${!want[k] ? 'on' : ''}">أي حصة تناسب</button>${fr.map(f => `<button type="button" data-w="${k}" data-v="${f}" class="${want[k] === f ? 'on' : ''}" ${want[k] !== f && used(f) ? 'disabled' : ''}>${perName(f)}</button>`).join('')}</div></div>`).join('') + (fr.length ? '' : '<p class="rq-none">ما عندك حصص فاضية في هذا اليوم.</p>');
+        $('#rqWant').innerHTML = !picked.size ? '' : `<p class="lbl">وش الحصة اللي تبي تدخلها بدالها؟ <small class="muted">(اختياري)</small></p>` + [...picked].sort().map(k => `<div class="rw-row"><b>بدل ${perName(k)}:</b><div class="rw-ch"><button type="button" data-w="${k}" data-v="" class="${!want[k] ? 'on' : ''}">أي حصة تناسب</button>${optsFor(k).map(f => `<button type="button" data-w="${k}" data-v="${f}" class="${want[k] === f ? 'on' : ''}${picked.has(f) ? ' own' : ''}" ${want[k] !== f && used(f) ? 'disabled' : ''}>${perName(f)}${picked.has(f) ? ' ⇄' : ''}</button>`).join('')}</div></div>`).join('') + `<p class="rq-hint">⇄ = حصة ثانية عندك: تقلب الحصتين (صف هذي يدخل لهم وقت تلك، والعكس). وغيرها = حصة فاضية عندك.</p>`;
       };
-      $('#rqWant').onclick = e => { const b = e.target.closest('[data-w]'); if (!b || b.disabled) return; e.preventDefault(); SND('tap'); if (b.dataset.v) want[b.dataset.w] = b.dataset.v; else delete want[b.dataset.w]; paint(); };
+      $('#rqWant').onclick = e => {
+        const b = e.target.closest('[data-w]'); if (!b || b.disabled) return; e.preventDefault(); SND('tap');
+        const k = b.dataset.w, v = b.dataset.v, prev = want[k];
+        if (prev && picked.has(prev) && want[prev] === k) delete want[prev]; // فك القلب القديم
+        if (v) { want[k] = v; if (picked.has(v)) want[v] = k; } else delete want[k]; // قلب الحصتين يتعبّى للطرفين
+        paint();
+      };
       $('#rqPer').onclick = e => {
         const b = e.target.closest('[data-p]'); if (!b) return;
         e.preventDefault(); e.stopPropagation();

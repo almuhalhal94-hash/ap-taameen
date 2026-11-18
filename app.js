@@ -324,8 +324,10 @@
         const bc = ctx.cell(b.id, s2);
         if (!bc || bc.swap || NON_TEACHING.has(bc.t) || bc.c !== it.c) continue;
         const iv2 = ivOf(s2, it.c);
-        if (overlap(iv2, winOf(sw))) continue;                         // صاحب الطلب برا المدرسة وقتها
-        if (ctx.busyIv(a, iv2) || ctx.isOutIv(b.id, iv2)) continue;    // صاحب الطلب فاضي وقتها
+        // «قلب حصتين»: المعلم ما يطلع، يبادل وقت حصتين عنده — فوقت حصته الثانية يعتبر فاضي لأنه بيتبدّل هو بعد
+        const vac = sw.reorder ? new Set(sw.items.map(x => x.s)) : null;
+        if (!sw.reorder && overlap(iv2, winOf(sw))) continue;          // صاحب الطلب برا المدرسة وقتها
+        if ((ctx.busyIv(a, iv2) && !(vac && vac.has(s2))) || ctx.isOutIv(b.id, iv2)) continue; // صاحب الطلب فاضي وقتها
         opts.push({ b: b.id, s2, t2: bc.t, covering: covering.has(b.id), key: [covering.has(b.id) ? 1 : 0, hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
       }
     }
@@ -1142,7 +1144,8 @@
       const own = slots.filter(x => { const c = ctx.cell(a, x); return c && !NON_TEACHING.has(c.t); });
       if (!own.length) return { err: `${nm(a)} ما عنده حصص تدريس في الحصص المطلوبة (${slots.map(x => SLOT_NAME[x]).join('، ')}).` };
       const items = own.map(x => { const c = ctx.cell(a, x); return { s: x, c: c.c, t: c.t, b: '', s2: '', t2: '' }; });
-      const sw = { a, mode: 'pick', slots: own, reason: 'طلب المعلم: ' + reason, items, req: true };
+      const reorder = Object.entries(want || {}).some(([k, w]) => own.includes(k) && own.includes(w));
+      const sw = { a, mode: 'pick', slots: own, reason: (reorder ? 'قلب حصتين — ' : '') + 'طلب المعلم: ' + reason, items, req: true, reorder };
       state.swaps.push(sw);
       const hist = historyCounts(date), pref = (prefer || '').replace(/^أ\.?\s*/, '').trim();
       const used = new Set();
@@ -1153,6 +1156,11 @@
         const best = (w && pref && opts.find(o => o.s2 === w && nm(o.b).includes(pref))) || (w && opts.find(o => o.s2 === w)) || (pref && opts.find(o => nm(o.b).includes(pref))) || opts[0];
         if (best && w && best.s2 !== w) it.wantMiss = w;
         if (best) { Object.assign(it, { b: best.b, s2: best.s2, t2: best.t2, m: true, none: false }); used.add(best.b + '|' + best.s2); }
+      }
+      // قلب حصتين: لازم ينجح كامل، وإلا ما نطبّق نصه (عشان ما يصير عند المعلم صفين بنفس الوقت)
+      if (reorder && sw.items.some(it => !it.b)) {
+        state.swaps = state.swaps.filter(x => x !== sw); afterChange();
+        return { err: `ما تيسّر قلب الحصص لـ ${nm(a)}: ما فيه زميل يدرّس نفس الصف ويقدر يتبادل في الوقت المطلوب لكل الحصص. تقدر ترتبه بنفسك أو تعتذر عن الطلب.` };
       }
       afterChange();
       const res = sw.items.map(it => it.b
