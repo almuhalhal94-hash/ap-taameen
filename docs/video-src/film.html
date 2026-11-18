@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<script type="importmap">{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }</script>
+<style>
+@font-face{font-family:R;font-weight:400;src:url(a/readex-pro-arabic-400-normal.woff2)}
+@font-face{font-family:R;font-weight:700;src:url(a/readex-pro-arabic-700-normal.woff2)}
+@font-face{font-family:L;font-weight:600;src:url(a/readex-pro-latin-600-normal.woff2)}
+@font-face{font-family:A;font-weight:700;src:url(a/amiri-arabic-700-normal.woff2)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#12070a;font-family:R,L}
+canvas{position:absolute;left:0;top:0}
+#ov{position:absolute;inset:0;pointer-events:none}
+.w{display:inline-block;will-change:transform}
+#panel{position:absolute;right:130px;top:0;width:820px;height:1080px}
+#badge{position:absolute;right:0;top:240px;display:flex;align-items:center;gap:18px;font:700 32px R;color:#2b0408;background:linear-gradient(#f9e2a8,#e2b45a 55%,#b8862b);padding:10px 34px 10px 12px;border-radius:60px;box-shadow:0 12px 40px rgba(0,0,0,.4),0 0 40px rgba(226,180,90,.25)}
+#badge b{width:64px;height:64px;border-radius:50%;background:#2b0408;color:#f2c96b;display:grid;place-items:center;font:600 38px L}
+.tt{position:absolute;right:0;top:360px;width:820px;text-align:right;font:700 104px/1.3 A;color:#f2c96b;text-shadow:0 8px 40px rgba(0,0,0,.55)}
+.tt .clip{display:inline-block;overflow:hidden;padding:0 4px 18px;margin-bottom:-18px;vertical-align:top}
+.sb{position:absolute;right:0;top:520px;width:820px;text-align:right;font:400 46px/1.5 R;color:#f3e6d6}
+.ch{position:absolute;right:0;top:640px;width:820px;display:flex;flex-wrap:wrap;gap:18px;justify-content:flex-start}
+.ch span{font:400 34px R;border:2px solid rgba(242,201,107,.55);color:#f9e2a8;padding:12px 30px;border-radius:50px;background:rgba(20,6,8,.55);display:inline-flex;align-items:center;gap:10px}
+.ch span.on{background:linear-gradient(#f9e2a8,#e2b45a 60%,#c99a40);color:#2b0408;border-color:#f9e2a8;box-shadow:0 0 40px rgba(242,201,107,.5)}
+.ch .ar{font:700 34px L;color:#e2b45a;align-self:center}
+.ch span .n{font:600 26px L;opacity:.8}
+.cc{direction:ltr;unicode-bidi:isolate;display:inline-flex}.cc i{font-style:normal;display:inline-block;font:600 34px L}
+.ltr{direction:ltr;unicode-bidi:isolate;font-family:L}
+#prog{position:absolute;right:130px;bottom:70px;display:flex;gap:14px;direction:rtl}
+#prog i{width:46px;height:8px;border-radius:6px;background:rgba(242,201,107,.22);display:block;position:relative;overflow:hidden}
+#prog i u{position:absolute;inset:0;background:#f2c96b;transform-origin:right;display:block}
+#intro{position:absolute;left:0;right:0;top:600px;text-align:center}
+#intro .t1{font:700 132px/1.25 A;color:#f2c96b;text-shadow:0 10px 50px rgba(0,0,0,.6)}
+#intro .t2{font:400 48px R;color:#eadbc5;margin-top:10px}
+#intro .t3{font:700 40px R;color:#f9e2a8;margin-top:22px;letter-spacing:0}
+#end{position:absolute;inset:0}
+#qr{position:absolute;left:170px;top:190px;width:440px;border-radius:38px;box-shadow:0 0 0 8px #e2b45a,0 50px 120px rgba(0,0,0,.65),0 0 120px rgba(226,180,90,.25)}
+#endT{position:absolute;right:130px;top:200px;width:660px;text-align:right}
+#endT .a{font:700 128px/1.2 A;color:#f2c96b}
+#endT .u{margin-top:18px;display:inline-block;font:600 44px L;color:#2b0408;background:linear-gradient(#f9e2a8,#e2b45a);padding:14px 40px;border-radius:60px;direction:ltr}
+#endT .s{font:400 34px/1.6 R;color:#eadbc5;margin-top:26px}
+#cred{position:absolute;left:0;right:0;bottom:0;height:200px;background:linear-gradient(#3a060e,#1a0709);border-top:4px solid #e2b45a;display:flex;justify-content:space-around;align-items:center;text-align:center;box-shadow:0 -20px 60px rgba(0,0,0,.5)}
+#cred div{font:400 30px R;color:#cdb79a}
+#cred b{display:block;font:700 52px/1.35 A;color:#f2c96b;margin-top:6px}
+#cred .sep{width:2px;height:120px;background:linear-gradient(transparent,#e2b45a,transparent)}
+</style></head><body>
+<canvas id="bg" width="1920" height="1080"></canvas>
+<div id="gl"></div>
+<canvas id="fx" width="1920" height="1080"></canvas>
+<div id="ov">
+  <div id="intro"><div class="t1" id="i1"></div><div class="t2" id="i2"></div><div class="t3" id="i3"></div></div>
+  <div id="panel"><div id="badge"><b id="bn">1</b><span id="bl"></span></div><div id="tts"></div></div>
+  <div id="prog"><i><u></u></i><i><u></u></i><i><u></u></i><i><u></u></i><i><u></u></i></div>
+  <div id="end"><img id="qr" src="a/qr.png"><div id="endT"><div class="a" id="ea"></div><div><span class="u" id="eu">ap-taameen.web.app/app</span></div><div class="s" id="es">امسح الباركود · أضفه للشاشة الرئيسية<br>وادخل برمزك من الإدارة</div></div>
+    <div id="cred"><div>إعداد<b>أ. طلال سعود</b></div><span class="sep"></span><div>المديران المساعدان<b>أ. أنور الجابري · أ. أحمد بوجيري</b></div><span class="sep"></span><div>مدير المدرسة<b>أ. خالد السيد</b></div></div></div>
+</div>
+<script src="rects.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const W = 1920, H = 1080, O = 2.5;            // O = بداية التعليق
+const $ = s => document.querySelector(s);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const E = { out3: x => 1 - Math.pow(1 - x, 3), out5: x => 1 - Math.pow(1 - x, 5), io3: x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2,
+  back: x => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); }, io: x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2 };
+const at = (t, a, b, e = 'out3') => E[e](prog(t, a, b));
+const lerp = (a, b, k) => a + (b - a) * k;
+function kf(t, K, e = 'io3') {            // K = [[t, v], …] ; v رقم أو مصفوفة
+  if (t <= K[0][0]) return K[0][1]; if (t >= K[K.length - 1][0]) return K[K.length - 1][1];
+  for (let i = 0; i < K.length - 1; i++) if (t >= K[i][0] && t <= K[i + 1][0]) {
+    const k = E[K[i + 1][2] || e]((t - K[i][0]) / (K[i + 1][0] - K[i][0])), a = K[i][1], b = K[i + 1][1];
+    return Array.isArray(a) ? a.map((v, j) => lerp(v, b[j], k)) : lerp(a, b, k); }
+}
+const rs = (st, sel) => (RS[st] || RM[st] || {})[sel];
+const ctr = r => [r[0] + r[2] / 2, r[1] + r[3] / 2];
+
+// ================= الخلفية =================
+const BG = $('#bg').getContext('2d');
+const pat = document.createElement('canvas'); pat.width = 2600; pat.height = 1600;
+{ const p = pat.getContext('2d'); p.strokeStyle = 'rgba(226,180,90,.075)'; p.lineWidth = 1.6; const S = 130;
+  const star = (cx, cy, r) => { p.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8, rr = i % 2 ? r * .62 : r; p.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); } p.closePath(); p.stroke(); };
+  for (let y = 0; y < 1600 + S; y += S) for (let x = 0; x < 2600 + S; x += S) { star(x, y, S * .42); p.beginPath(); p.rect(x + S / 2 - S * .16, y + S / 2 - S * .16, S * .32, S * .32); p.stroke(); } }
+const dust = Array.from({ length: 70 }, (_, i) => { const r = (n) => { const x = Math.sin(i * 127.1 + n * 311.7) * 43758.5453; return x - Math.floor(x); }; return { x: r(1) * W, y: r(2) * H, s: .6 + r(3) * 2.4, v: 6 + r(4) * 18, ph: r(5) * 6.28, a: .15 + r(6) * .45 }; });
+function drawBG(t, glow) {
+  const g = BG.createRadialGradient(W * .32, H * .45, 40, W * .45, H * .5, 1250);
+  g.addColorStop(0, '#6b0d1c'); g.addColorStop(.45, '#33050c'); g.addColorStop(1, '#0f0507');
+  BG.fillStyle = g; BG.fillRect(0, 0, W, H);
+  BG.save(); BG.globalAlpha = 1; BG.translate(W / 2, H / 2); BG.rotate(-.06 + t * .0025); BG.translate(-1300 - t * 6, -800 - t * 2.5); BG.drawImage(pat, 0, 0); BG.restore();
+  // توهج خلف الجوال
+  const gx = glow[0], gy = glow[1], gr = glow[2];
+  const g2 = BG.createRadialGradient(gx, gy, 0, gx, gy, gr); g2.addColorStop(0, `rgba(242,190,100,${glow[3] * .30})`); g2.addColorStop(.5, `rgba(180,60,60,${glow[3] * .12})`); g2.addColorStop(1, 'rgba(0,0,0,0)');
+  BG.fillStyle = g2; BG.fillRect(0, 0, W, H);
+  for (const d of dust) { const y = ((d.y - t * d.v) % H + H) % H, x = d.x + Math.sin(t * .4 + d.ph) * 20; BG.fillStyle = `rgba(249,226,168,${d.a * (.6 + .4 * Math.sin(t * 1.3 + d.ph))})`; BG.beginPath(); BG.arc(x, y, d.s, 0, 6.283); BG.fill(); }
+  const v = BG.createRadialGradient(W / 2, H / 2, 500, W / 2, H / 2, 1250); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.55)');
+  BG.fillStyle = v; BG.fillRect(0, 0, W, H);
+}
+
+// ================= الجوال 3D =================
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H); renderer.setClearColor(0x000000, 0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+$('#gl').appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(30, W / H, 0.05, 100);
+const key = new THREE.DirectionalLight(0xfff1dc, 2.4); key.position.set(3, 5, 6); scene.add(key);
+const rim = new THREE.DirectionalLight(0xf2c96b, 2.2); rim.position.set(-5, 2, -4); scene.add(rim);
+const rim2 = new THREE.DirectionalLight(0xff6070, 0.9); rim2.position.set(5, -2, -3); scene.add(rim2);
+scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+const scrC = document.createElement('canvas'); scrC.width = 780; scrC.height = 1688; const SX = scrC.getContext('2d');
+const scrTex = new THREE.CanvasTexture(scrC); scrTex.colorSpace = THREE.SRGBColorSpace; scrTex.anisotropy = 8;
+function rr(w, h, r) { const s = new THREE.Shape(), x = -w / 2, y = -h / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
+const rig = new THREE.Group(); scene.add(rig);
+const BW = 0.716, BH = 1.466, BD = 0.083;
+const SWd = BW - 0.05, SHd = SWd * 844 / 390;          // نسبة الشاشة = نسبة اللقطة بالضبط
+const metal = new THREE.MeshPhysicalMaterial({ color: new THREE.Color('#c9a866'), metalness: 0.9, roughness: 0.32, clearcoat: 0.3, envMapIntensity: 0.9 });
+const body = new THREE.Mesh(new RoundedBoxGeometry(BW, Math.max(BH, SHd + 0.05), BD, 8, 0.1), metal); rig.add(body);
+const BHr = Math.max(BH, SHd + 0.05);
+const front = new THREE.Mesh(new THREE.ShapeGeometry(rr(BW - 0.012, BHr - 0.012, 0.095), 24), new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.3 })); front.position.z = BD / 2 + 0.0005; rig.add(front);
+const sg = new THREE.ShapeGeometry(rr(SWd, SHd, 0.075), 24); { const p = sg.attributes.position, uv = []; for (let i = 0; i < p.count; i++) uv.push(p.getX(i) / SWd + .5, p.getY(i) / SHd + .5); sg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); }
+const screen = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ map: scrTex, toneMapped: false })); screen.position.z = BD / 2 + 0.001; rig.add(screen);
+const isl = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.14, 6, 16), new THREE.MeshBasicMaterial({ color: 0x000000 })); isl.rotation.z = Math.PI / 2; isl.scale.z = 0.05; isl.position.set(0, SHd / 2 - 0.045, BD / 2 + 0.0015); rig.add(isl);
+const hole = new THREE.Mesh(new THREE.CircleGeometry(0.018, 24), new THREE.MeshBasicMaterial({ color: 0x000000 })); hole.position.set(0, SHd / 2 - 0.035, BD / 2 + 0.0015); rig.add(hole);
+const btn = (x, y, h) => { const b = new THREE.Mesh(new RoundedBoxGeometry(0.012, h, 0.03, 3, 0.005), metal); b.position.set(x, y, 0); rig.add(b); };
+btn(-BW / 2 - 0.004, 0.38, 0.06); btn(-BW / 2 - 0.004, 0.26, 0.11); btn(-BW / 2 - 0.004, 0.12, 0.11); btn(BW / 2 + 0.004, 0.2, 0.18);
+const bump = new THREE.Mesh(new RoundedBoxGeometry(0.36, 0.38, 0.03, 6, 0.06), new THREE.MeshPhysicalMaterial({ color: 0x2a1a12, metalness: 0.4, roughness: 0.25, clearcoat: 1 }));
+bump.position.set(-BW / 2 + 0.22, BHr / 2 - 0.23, -BD / 2 - 0.012); rig.add(bump);
+for (const [x, y] of [[-0.07, 0.08], [-0.07, -0.08], [0.08, 0]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.03, 32), new THREE.MeshPhysicalMaterial({ color: 0x0a0a0c, metalness: 0.8, roughness: 0.05, clearcoat: 1 })); l.rotation.x = Math.PI / 2; l.position.set(bump.position.x + x, bump.position.y + y, -BD / 2 - 0.03); rig.add(l); }
+const glass = new THREE.Mesh(new THREE.ShapeGeometry(rr(BW - 0.012, BHr - 0.012, 0.095), 24), new THREE.MeshPhysicalMaterial({ color: 0x000000, transparent: true, opacity: 0.04, roughness: 0.05, clearcoat: 0.5, envMapIntensity: 0.25 })); glass.position.z = BD / 2 + 0.002; rig.add(glass);
+const tmpV = new THREE.Vector3();
+const sp = (fx, fy) => screen.localToWorld(tmpV.set((fx - .5) * SWd, (.5 - fy) * SHd, 0.002).clone());
+const target = new THREE.Vector3();
+function pose(c) {
+  const d = Math.PI / 180;
+  rig.rotation.set(c.rx * d, c.ry * d, (c.rz || 0) * d); rig.position.set(c.x || 0, c.y || 0, 0); rig.updateMatrixWorld(true);
+  const dist = 3.7 / (c.s || 1);
+  const k = clamp(((c.s || 1) - 1) / 1.1);
+  target.copy(new THREE.Vector3(0, 0, 0)).lerp(sp(c.fx ?? .5, c.fy ?? .5), k);
+  const n = new THREE.Vector3(0, 0, 1).applyQuaternion(screen.getWorldQuaternion(new THREE.Quaternion()));
+  const vd = new THREE.Vector3(0, 0.08, 1).normalize().lerp(n, k * 0.55).normalize();
+  camera.position.copy(target).addScaledVector(vd, dist); camera.lookAt(target);
+  camera.setViewOffset(W, H, (c.ox ?? .17) * W, 0, W, H);   // الجوال يسار، والنص يمين
+  camera.updateProjectionMatrix();
+}
+function screenToPx(fx, fy) { const v = sp(fx, fy).project(camera); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * H]; }
+
+// ================= الصور =================
+const cache = new Map();
+function load(name) {
+  if (cache.has(name)) return cache.get(name);
+  const src = name.startsWith('mk:') ? `mk/${name.slice(3)}.jpg` : name.startsWith('a:') ? `a/${name.slice(2)}` : `st/${name}.jpg`;
+  const pr = new Promise((res, rej) => { const im = new Image(); im.onload = () => createImageBitmap(im, { resizeWidth: 780, resizeHeight: 1688, resizeQuality: 'high' }).then(res); im.onerror = () => rej(src); im.src = src; });
+  cache.set(name, pr); if (cache.size > 60) cache.delete(cache.keys().next().value); return pr;
+}
+const handImg = new Image(); handImg.src = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80"><path d="M24 4c3.3 0 6 2.7 6 6v22l2.4-.9c3-1 6 .6 7 3.4 3-1.2 6.4.3 7.6 3.3 3-.8 6.2 1.1 6.8 4.2l1.4 15c.9 9.8-6.3 18-16.2 18H35c-5.4 0-9.4-2.2-12.6-6.6L9.6 50.6c-2-2.8-1.4-6.6 1.4-8.4 2.6-1.7 6-1 7.8 1.4L18 44V10c0-3.3 2.7-6 6-6z" fill="#fff" stroke="#2b0408" stroke-width="3" stroke-linejoin="round"/></svg>`);
+const iconImg = new Image(); iconImg.src = 'a/icon.svg';
+const sumImg = id => id;
+
+// ================= جدول الشاشة =================
+const SCR = [];   // [t, img, fade]
+const sq = (t, img, f = .18) => SCR.push([t, img, f]);
+const seq = (t0, t1, pre, n, from = 0) => { for (let i = 0; i < n; i++) SCR.push([t0 + (t1 - t0) * i / (n - 1), pre + String(i + from).padStart(2, '0'), 0]); };
+const seqM = (t0, t1, pre, n) => { for (let i = 0; i < n; i++) SCR.push([t0 + (t1 - t0) * i / (n - 1), 'mk:' + pre + i, 0]); };
+sq(0, 'L0', 0);
+sq(6.46, 'mk:cam0', .25); sq(7.45, 'mk:cam1', .12);
+sq(8.75, 'mk:sa0', .25);
+seqM(11.3, 11.62, 'sa1_', 9); sq(12.35, 'mk:sa1_hl', .08);
+seqM(12.72, 13.05, 'sa2_', 9);
+seqM(13.62, 14.05, 'home_', 9);
+sq(14.75, 'mk:ch0', 0);
+seqM(15.68, 15.92, 'ch1_', 7); sq(16.55, 'mk:ch1_hl', .08);
+seqM(16.82, 17.05, 'ch2_', 7);
+seqM(17.42, 17.8, 'ahome_', 9);
+sq(18.2, 'L0', 0);
+['L1', 'L2', 'L3', 'L4', 'L5', 'L6'].forEach((s, i) => sq(19.5 + i * .25, s, 0));
+seq(23.38, 23.86, 'TIN', 8); sq(23.95, 'T0', .1);
+for (let i = 1; i <= 9; i++) sq(29.1 + (i - 1) * .09, 'D' + String(i).padStart(2, '0'), 0);
+seq(29.95, 30.4, 'C', 9); sq(30.42, 'C_open', 0);
+seq(30.62, 31.1, 'F', 9); sq(31.15, 'A_done', .15);
+sq(31.75, 'E0', .3);
+seq(32.58, 33.03, 'X', 9); sq(33.05, 'X_open', 0); sq(33.92, 'X_pick', .06);
+seq(34.32, 34.8, 'RJ', 9); sq(34.85, 'RJ_done', .12);
+seq(36.42, 36.87, 'U', 8); sq(36.95, 'U_done', .1);
+sq(37.6, 'E1', .3);
+seq(38.55, 38.87, 'Q', 9); sq(38.9, 'Q_blank', 0);
+sq(40.75, 'Q_day', .15); sq(44.15, 'Q_pick', .08);
+['Q_r1', 'Q_r2', 'Q_r3', 'Q_r4', 'Q_r5', 'Q_r6'].forEach((s, i) => sq(44.7 + i * .13, s, 0));
+seq(45.9, 46.26, 'S', 7); sq(46.3, 'S_done', .08);
+sq(46.95, 'S_ok_scroll', .35);
+sq(48.55, 'P_L6', 0);
+seq(49.55, 50.05, 'PIN', 6); sq(50.1, 'P_T0', .08);
+seq(51.95, 52.2, 'PS', 6); sq(52.25, 'P_S0', .05);
+sq(55.6, 'L0', .4);
+SCR.sort((a, b) => a[0] - b[0]);
+function scrAt(t) { let i = 0; while (i + 1 < SCR.length && SCR[i + 1][0] <= t) i++; const cur = SCR[i], prev = SCR[Math.max(0, i - 1)]; const k = cur[2] ? clamp((t - cur[0]) / cur[2]) : 1; return { a: prev[1], b: cur[1], k: i === 0 ? 1 : k }; }
+
+// حلقات النبض: [t0, t1, state, selector | rect]
+const RINGS = [
+  [7.5, 8.55, 'cam1', 'pill'], [10.6, 11.25, 'sa0', 'share'], [12.25, 12.62, 'sa1_8', 'a2h'], [13.15, 13.55, 'sa2_8', 'add'], [14.05, 14.6, 'home_8', 'appic', 1],
+  [15.3, 15.62, 'ch0', 'dots'], [16.45, 16.75, 'ch1_6', 'inst'], [17.08, 17.32, 'ch2_6', 'instbtn'], [17.8, 18.15, 'ahome_8', 'appic', 1],
+  [19.0, 21.1, 'L0', '#codeBoxes'], [22.5, 23.33, 'L0', '#loginBtn'],
+  [25.1, 26.0, 'T0', '#stack .card.top .per'], [25.95, 26.55, 'T0', '#stack .card.top .code'], [26.5, 27.3, 'T0', '#stack .card.top .tm'],
+  [27.4, 28.95, 'T0', '#btnYes'], [30.45, 30.62, 'C_open', '[data-x=go]'],
+  [32.0, 32.56, 'E0', '#btnNo'], [33.45, 33.92, 'X_open', '#rsn [data-r="1"]'], [34.0, 34.3, 'X_pick', '[data-x=go]'],
+  [35.2, 36.42, 'RJ_done', '#snackUndo'],
+  [37.6, 38.52, 'E1', '#btnReq'], [40.15, 40.72, 'Q_blank', '#rqDate'], [41.4, 43.6, 'Q_day', '#rqPer'], [43.7, 44.15, 'Q_day', 'per3'], [44.55, 45.5, 'Q_r6', '#rqWhy'], [45.5, 45.88, 'Q_r6', '[data-x=go]'],
+  [47.3, 48.3, 'S_ok_scroll', '#reqList .item'],
+  [49.0, 49.55, 'P_L6', '#loginBtn'], [50.5, 51.2, 'P_T0', '#tabTasks'], [51.5, 51.95, 'P_T0', '#tabSup'],
+  [53.2, 53.7, 'P_S0', 'sup0'], [53.65, 54.15, 'P_S0', 'sup1'], [54.1, 54.6, 'P_S0', 'sup2'], [54.55, 55.0, 'P_S0', 'sup3'],
+];
+function rectOf(st, sel) {
+  if (sel === 'per3') return RS.Q_day.__per[0].slice(1);
+  if (sel.startsWith('sup')) return RS.P_S0.__sup[+sel.slice(3)];
+  return rs(st, sel);
+}
+// الإصبع: [tIn, tTap, tOut, state, selector, (drag: [dx, t0, t1])]
+const TAPS = [
+  [8.0, 8.55, 8.9, 'cam1', 'pill'], [10.7, 11.22, 11.6, 'sa0', 'share'], [12.2, 12.62, 12.9, 'sa1_8', 'a2h'], [13.15, 13.5, 13.8, 'sa2_8', 'add'],
+  [15.25, 15.62, 15.95, 'ch0', 'dots'], [16.4, 16.72, 16.95, 'ch1_6', 'inst'], [17.0, 17.3, 17.55, 'ch2_6', 'instbtn'],
+  [22.9, 23.3, 23.6, 'L0', '#loginBtn'],
+  [27.6, -1, 28.75, 'T0', '#btnYes'],
+  [28.85, -1, 30.0, 'T0', '#stack .card.top', [171, 29.1, 29.9]],
+  [30.2, 30.55, 30.85, 'C_open', '[data-x=go]'],
+  [32.05, 32.52, 32.8, 'E0', '#btnNo'], [33.55, 33.88, 34.05, 'X_open', '#rsn [data-r="1"]'], [34.05, 34.28, 34.55, 'X_pick', '[data-x=go]'],
+  [35.9, 36.38, 36.75, 'RJ_done', '#snackUndo'],
+  [38.1, 38.5, 38.8, 'E1', '#btnReq'], [40.3, 40.7, 41.0, 'Q_blank', '#rqDate'], [43.75, 44.1, 44.45, 'Q_day', 'per3'], [45.45, 45.85, 46.15, 'Q_r6', '[data-x=go]'],
+  [49.1, 49.5, 49.8, 'P_L6', '#loginBtn'], [51.55, 51.9, 52.25, 'P_T0', '#tabSup'],
+];
+// التقريب والكاميرا: [t, s, fx, fy, rx, ry]
+const CAM = [
+  [5.0, 1, .5, .5, 8, -24], [6.2, 1, .5, .5, 4, -14], [7.2, 1.35, .5, .45, 2, -8], [8.4, 1.2, .5, .7, 2, -6],
+  [9.2, 1.0, .5, .5, 4, -12], [10.6, 1.0, .5, .55, 3, -10], [11.0, 1.55, .47, .9, 0, -4], [11.9, 1.25, .5, .7, 2, -6], [12.75, 1.0, .5, .5, 3, -10], [13.15, 1.7, .25, .12, 0, -4], [13.55, 1.7, .25, .12, 0, -4], [13.85, 1.15, .7, .6, 2, -8],
+  [14.3, 1.0, .5, .5, 4, -14], [15.1, 1.0, .5, .5, 4, -14], [15.5, 1.5, .75, .2, 0, -6], [16.4, 1.45, .62, .35, 0, -6], [17.1, 1.1, .5, .5, 2, -8], [17.6, 1.1, .7, .6, 2, -8],
+  [18.0, 1.0, .5, .5, 6, -16], [19.0, 1.0, .5, .5, 4, -12], [19.5, 1.95, .5, .53, 0, -4], [22.3, 1.95, .5, .53, 0, -4], [22.9, 1.45, .5, .6, 1, -6], [23.6, 1.0, .5, .5, 4, -12],
+  [24.4, 1.85, .5, .32, 0, -5], [27.2, 1.85, .5, .32, 0, -5], [27.7, 1.35, .5, .55, 2, -7], [28.9, 1.25, .5, .45, 2, -7], [30.2, 1.25, .5, .6, 2, -8], [30.7, 1.1, .5, .5, 3, -10],
+  [31.7, 1.1, .5, .5, 3, -10], [32.3, 1.4, .5, .6, 1, -7], [33.2, 1.45, .5, .65, 1, -6], [34.2, 1.4, .5, .75, 1, -6], [34.9, 1.25, .5, .7, 2, -8], [35.4, 2.0, .3, .86, 0, -4], [36.7, 2.0, .3, .86, 0, -4], [37.3, 1.0, .5, .5, 4, -12],
+  [37.9, 1.3, .5, .72, 2, -8], [38.9, 1.2, .5, .55, 2, -8], [39.8, 1.7, .5, .4, 0, -5], [41.2, 1.7, .5, .45, 0, -5], [41.9, 1.85, .5, .56, 0, -4], [43.9, 1.85, .5, .56, 0, -4], [44.6, 1.7, .5, .76, 0, -5], [45.6, 1.5, .5, .82, 1, -6], [46.3, 1.0, .5, .5, 4, -10],
+  [46.7, 1.55, .5, .14, 0, -5], [47.15, 1.55, .5, .14, 0, -5], [47.6, 1.65, .5, .7, 0, -5], [48.0, 1.65, .5, .7, 0, -5], [48.2, 1.0, .5, .5, 6, -14],
+  [49.0, 1.2, .5, .55, 3, -10], [50.0, 1.0, .5, .5, 4, -12], [50.4, 1.6, .55, .92, 1, -6], [52.0, 1.6, .55, .92, 1, -6], [52.6, 1.0, .5, .5, 3, -10], [53.0, 1.55, .5, .45, 0, -5], [54.8, 1.55, .5, .45, 0, -5], [55.4, 1.0, .5, .5, 6, -16],
+];
+// لفّات: [t0, t1] لفة كاملة حول Y
+const SPINS = [[14.25, 14.95], [17.85, 18.55], [48.05, 48.8]];
+
+// ================= النصوص =================
+const TT = [   // [t0, t1, title, sub, chips[[txt, tOn]], badge]
+  [6.6, 8.5, 'امسح الباركود', 'بكاميرا تلفونك', [], 1],
+  [8.6, 14.3, 'على الآيفون', '', [['Safari', 10.04], ['مشاركة', 11.2], ['إضافة إلى الشاشة الرئيسية', 12.6]], 1],
+  [14.45, 17.84, 'على الأندرويد', '', [['Chrome', 15.5], ['تثبيت التطبيق', 16.7]], 1],
+  [18.3, 23.58, 'رمزك من 6 أرقام', 'يوصلك من الإدارة', [['🔒 لا تشاركه مع أحد', 22.45]], 2, { sub: 21.12, title: 18.9 }],
+  [23.75, 27.25, 'تكليفك في بطاقة', '', [['الحصة الرابعة', 25.18], ['<bdi dir="ltr" class="cc"><i>2</i><i>ع</i><i>1</i></bdi>', 26.02], ['<span class="ltr">10:10–10:55</span>', 26.56]], 3],
+  [27.35, 30.65, 'استلمت التكليف', 'اضغط الزر… أو اسحب يمينًا', [], 3, { sub: 28.94 }],
+  [30.75, 34.35, 'عندي عذر رسمي', 'واختر السبب', [], 3, { sub: 33.54, title: 31.9 }],
+  [34.45, 37.0, 'تراجع خلال ثوانٍ', 'لو أخطأت', [], 3, { sub: 34.6, title: 35.3 }],
+  [37.1, 41.25, 'طلب تبديل حصة', 'اختر اليوم', [], 4, { sub: 40.36 }],
+  [41.35, 45.45, 'حصصك الحقيقية', 'من الجدول', [['اختر الحصة', 43.68], ['اكتب السبب', 44.64]], 4, { sub: 42.98 }],
+  [45.55, 48.1, 'أرسل الطلب', 'والرد يوصلك من الإدارة', [], 4, { sub: 46.24 }],
+  [48.25, 55.0, 'رمز واحد للمشرف', 'تابع تأمين صفوفك أولًا بأول', [['تكليفاتي', 50.64], ['المتابعة', 51.86]], 5, { title: 49.4, sub: 52.6 }],
+];
+const BADGE = { 1: 'التثبيت', 2: 'الدخول', 3: 'بطاقة التكليف', 4: 'طلب تبديل', 5: 'المشرف' };
+const words = (s, cls = '') => s.split(' ').map(w => `<span class="clip"><span class="w ${cls}">${w}</span></span>`).join(' ');
+const tts = $('#tts');
+tts.innerHTML = TT.map((c, i) => `<div class="blk" id="b${i}" style="position:absolute;inset:0;opacity:0"><div class="tt">${words(c[2])}</div><div class="sb">${c[3] ? words(c[3]).replace(/class="clip"/g, 'class="clip" style="padding-bottom:6px"') : ''}</div><div class="ch">${c[4].map(x => `<span>${x[0]}</span>`).join(c[5] === 1 ? '<b class="ar">←</b>' : '')}</div></div>`).join('');
+$('#i1').innerHTML = words('تطبيق التأمين والتبديل'); $('#i2').innerHTML = words('مدرسة ابن رشد الإعدادية للبنين'); $('#i3').innerHTML = words('تكليفاتك كلها في تلفونك');
+$('#ea').innerHTML = words('ابدأ الآن');
+const wordAnim = (el, t, t0, gap = .09, dur = .55) => { el.querySelectorAll('.w').forEach((w, i) => { const k = at(t, t0 + i * gap, t0 + i * gap + dur, 'out5'); w.style.transform = `translateY(${(1 - k) * 110}%)`; w.style.opacity = k > 0 ? 1 : 0; }); };
+
+function drawText(t) {
+  // المقدمة
+  const iv = t < 6.6; $('#intro').style.display = iv ? 'block' : 'none';
+  if (iv) {
+    const iw = $('#i1').querySelectorAll('.w'); [2.5, 3.18, 3.62].forEach((s, i) => { const k = at(t, s - .12, s + .45, 'out5'); iw[i].style.transform = `translateY(${(1 - k) * 110}%)`; iw[i].style.opacity = k > 0 ? 1 : 0; });
+    wordAnim($('#i2'), t, 4.0, .07); wordAnim($('#i3'), t, 4.5, .1);
+    const out = at(t, 5.1, 5.85, 'io3'); $('#intro').style.transform = `translateY(${-out * 80}px) scale(${1 - out * .12})`; $('#intro').style.opacity = 1 - out;
+  }
+  // اللوحة
+  let badge = 0;
+  TT.forEach((c, i) => {
+    const el = $('#b' + i), on = t >= c[0] - .05 && t <= c[1] + .05; el.style.opacity = on ? 1 : 0; if (!on) return; badge = c[5];
+    const o = c[6] || {};
+    const out = at(t, c[1] - .35, c[1], 'io3');
+    el.style.transform = `translateY(${-out * 40}px)`; el.style.opacity = 1 - out;
+    wordAnim(el.querySelector('.tt'), t, o.title ?? c[0]);
+    wordAnim(el.querySelector('.sb'), t, o.sub ?? (c[0] + .35), .07);
+    el.querySelectorAll('.ch .ar').forEach((a, j) => { a.style.opacity = at(t, c[4][j + 1][1] - .3, c[4][j + 1][1]); });
+    [...el.querySelector('.ch').children].filter(x => x.tagName === 'SPAN').forEach((s, j) => { const tOn = c[4][j][1]; const k = at(t, tOn - .25, tOn + .25, 'back'); s.style.transform = `translateY(${(1 - clamp(k, 0, 1.2)) * 40}px) scale(${.85 + .15 * k})`; s.style.opacity = clamp(k * 2); s.classList.toggle('on', c[5] === 1 && t >= tOn && j === c[4].findLastIndex(x => t >= x[1])); });
+  });
+  const bIn = TT.find(c => t >= c[0] - .05 && t <= c[1] + .05);
+  const bd = $('#badge'); bd.style.opacity = bIn ? 1 : 0;
+  if (bIn) { const first = TT.find(c => c[5] === bIn[5]); const k = at(t, first[0] - .1, first[0] + .45, 'back'); const last = [...TT].reverse().find(c => c[5] === bIn[5]); const o = at(t, last[1] - .3, last[1], 'io3');
+    bd.style.transform = `translateX(${(1 - clamp(k)) * -60}px) scale(${.7 + .3 * k})`; bd.style.opacity = clamp(k * 1.5) * (1 - o); $('#bn').textContent = bIn[5]; $('#bl').textContent = BADGE[bIn[5]]; }
+  // شريط الخطوات
+  const pv = t > 6.4 && t < 55.2; $('#prog').style.opacity = pv ? at(t, 6.4, 7) * (1 - at(t, 54.8, 55.2)) : 0;
+  const bounds = [[6.46, 18.0], [18.0, 23.58], [23.58, 37.04], [37.04, 48.16], [48.16, 55.02]];
+  document.querySelectorAll('#prog u').forEach((u, i) => { u.style.transform = `scaleX(${prog(t, bounds[i][0], bounds[i][1])})`; });
+  // الخاتمة
+  const ev = t > 55.0; $('#end').style.display = ev ? 'block' : 'none';
+  if (ev) {
+    const q = at(t, 55.0, 55.9, 'back'); $('#qr').style.transform = `translateY(${(1 - clamp(q)) * 200}px) rotate(${(1 - clamp(q)) * -8 - 2 + Math.sin(t * .8) * 1.2}deg) scale(${.8 + .2 * q})`; $('#qr').style.opacity = clamp(q * 1.5);
+    wordAnim($('#ea'), t, 56.6, .12, .6);
+    const u = at(t, 56.2, 56.9, 'back'); $('#eu').style.transform = `scale(${.6 + .4 * u})`; $('#eu').style.opacity = clamp(u * 1.4);
+    $('#es').style.opacity = at(t, 57.2, 57.9); $('#es').style.transform = `translateY(${(1 - at(t, 57.2, 57.9)) * 20}px)`;
+    const c = at(t, 57.6, 58.6, 'out5'); $('#cred').style.transform = `translateY(${(1 - c) * 220}px)`;
+    $('#cred').querySelectorAll('div').forEach((d, i) => { const k = at(t, 58.0 + i * .25, 58.6 + i * .25, 'out5'); d.style.opacity = k; d.style.transform = `translateY(${(1 - k) * 30}px)`; });
+  }
+}
+
+// ================= الشعار يتشكّل (المقدمة) =================
+const FX = $('#fx').getContext('2d');
+const SHIELD = new Path2D('M256 92 L384 138 V246 C384 330 330 386 256 420 C182 386 128 330 128 246 V138 Z');
+const SHIN = new Path2D('M256 116 L362 154 V246 C362 316 318 362 256 392 C194 362 150 316 150 246 V154 Z');
+const A1 = new Path2D('M190 246 A70 70 0 0 1 312 214'), A2 = new Path2D('M322 266 A70 70 0 0 1 200 298');
+function drawLogo(t) {
+  FX.clearRect(0, 0, W, H);
+  if (t > 6.5) return;
+  const out = at(t, 5.2, 6.2, 'io3');
+  const S = 0.66 * (1 - out * .55), cx = lerp(960, 640, out), cy = lerp(330, 520, out);
+  FX.save(); FX.globalAlpha = 1 - out; FX.translate(cx, cy); FX.scale(S, S); FX.translate(-256, -256);
+  // البلاطة تظهر بعد اكتمال الرسم
+  const tile = at(t, 1.95, 2.45, 'out3');
+  if (tile > 0) { FX.save(); FX.globalAlpha *= tile; const r = new Path2D(); r.roundRect(0, 0, 512, 512, 112); const g = FX.createRadialGradient(256, 150, 20, 256, 256, 420); g.addColorStop(0, '#7a0f1d'); g.addColorStop(.6, '#4d0610'); g.addColorStop(1, '#2b0408'); FX.shadowColor = 'rgba(242,190,100,.55)'; FX.shadowBlur = 120 * tile; FX.fillStyle = g; FX.fill(r); FX.restore(); }
+  const gold = FX.createLinearGradient(0, 92, 0, 420); gold.addColorStop(0, '#f9e2a8'); gold.addColorStop(.55, '#e2b45a'); gold.addColorStop(1, '#b8862b');
+  // رسم الخطوط
+  const k1 = at(t, 0.25, 1.55, 'io3'), k2 = at(t, 1.25, 2.05, 'io3');
+  FX.lineCap = 'round'; FX.lineJoin = 'round';
+  FX.strokeStyle = gold; FX.shadowColor = '#f2c96b'; FX.shadowBlur = 24;
+  FX.setLineDash([1100, 1100]); FX.lineDashOffset = 1100 * (1 - k1); FX.lineWidth = 10; FX.stroke(SHIELD);
+  const fill = at(t, 1.6, 2.2, 'out3');
+  if (fill > 0) { FX.save(); FX.globalAlpha *= fill; FX.shadowBlur = 0; FX.fillStyle = gold; FX.fill(SHIELD); const ig = FX.createLinearGradient(0, 116, 0, 392); ig.addColorStop(0, '#5a0812'); ig.addColorStop(1, '#2b0408'); FX.fillStyle = ig; FX.fill(SHIN); FX.restore(); }
+  FX.setLineDash([260, 260]); FX.lineWidth = 24; FX.lineDashOffset = 260 * (1 - k2); FX.shadowBlur = 18; FX.stroke(A1); FX.stroke(A2);
+  // رؤوس الأسهم
+  const hk = at(t, 1.95, 2.2, 'back');
+  if (hk > 0) { FX.setLineDash([]); FX.fillStyle = gold; for (const [x, y, a] of [[312, 214, -0.35], [200, 298, 2.8]]) { FX.save(); FX.translate(x, y); FX.rotate(a); FX.scale(hk, hk); FX.beginPath(); FX.moveTo(-6, -24); FX.lineTo(30, 4); FX.lineTo(-14, 22); FX.closePath(); FX.fill(); FX.restore(); } }
+  // لمعة
+  const gl = prog(t, 2.25, 2.95);
+  if (gl > 0 && gl < 1) { FX.save(); FX.clip(SHIELD); FX.globalCompositeOperation = 'lighter'; const x = lerp(60, 470, gl); const lg = FX.createLinearGradient(x - 60, 0, x + 60, 0); lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(.5, 'rgba(255,250,230,.75)'); lg.addColorStop(1, 'rgba(255,255,255,0)'); FX.fillStyle = lg; FX.fillRect(0, 0, 512, 512); FX.restore(); }
+  FX.restore();
+  // شرارات عند الاكتمال
+  const sp2 = prog(t, 2.2, 3.4);
+  if (sp2 > 0 && sp2 < 1) for (let i = 0; i < 26; i++) { const a = i / 26 * 6.283 + i, d = 140 + E.out3(sp2) * (180 + (i % 5) * 40); FX.fillStyle = `rgba(249,226,168,${(1 - sp2) * .9})`; FX.beginPath(); FX.arc(960 + Math.cos(a) * d, 330 + Math.sin(a) * d * .9, 2 + (i % 3), 0, 6.283); FX.fill(); }
+}
+
+// ================= رسم الشاشة =================
+let curA = null, curB = null;
+async function drawScreen(t) {
+  const s = scrAt(t); const [ia, ib] = await Promise.all([load(s.a), load(s.b)]);
+  SX.globalAlpha = 1; SX.drawImage(ia, 0, 0); if (s.k < 1) { SX.globalAlpha = s.k; SX.drawImage(ib, 0, 0); SX.globalAlpha = 1; } else SX.drawImage(ib, 0, 0);
+  const K = 2;   // CSS → بكسل الشاشة
+  // إشعار الموافقة
+  const nb = at(t, 46.5, 46.9, 'back') * (1 - at(t, 47.9, 48.2));
+  if (nb > 0) { SX.save(); const y = lerp(-180, 60, clamp(nb)); SX.shadowColor = 'rgba(0,0,0,.5)'; SX.shadowBlur = 40; SX.fillStyle = 'rgba(40,36,38,.96)'; const r = new Path2D(); r.roundRect(24, y, 732, 150, 36); SX.fill(r); SX.shadowBlur = 0;
+    SX.drawImage(iconImg, 50, y + 30, 90, 90); SX.fillStyle = '#fff'; SX.textAlign = 'right'; SX.direction = 'rtl'; SX.font = '700 32px R'; SX.fillText('✓ وافقت الإدارة على طلب التبديل', 724, y + 62); SX.font = '400 27px R'; SX.fillStyle = '#d6cfc8'; SX.fillText('الأربعاء 11-11-2026 — حصتك الثالثة (2ع1)…', 724, y + 108); SX.restore(); }
+  // حلقات
+  for (const [t0, t1, st, sel, round] of RINGS) {
+    if (t < t0 - .2 || t > t1 + .25) continue; const r = rectOf(st, sel); if (!r) continue;
+    const kin = at(t, t0 - .2, t0 + .15, 'back'), kout = 1 - at(t, t1, t1 + .25); const a = clamp(kin) * kout; if (a <= 0) continue;
+    const pad = 6, x = r[0] * K - pad, y = r[1] * K - pad, w = r[2] * K + pad * 2, h = r[3] * K + pad * 2, rad = round ? Math.min(w, h) / 2 : Math.min(28, h / 2);
+    SX.save(); SX.globalAlpha = a; SX.lineWidth = 6; SX.strokeStyle = '#f2c96b'; SX.shadowColor = '#f2c96b'; SX.shadowBlur = 26;
+    const p = new Path2D(); p.roundRect(x, y, w, h, rad); SX.stroke(p);
+    const ph = ((t - t0) % .9) / .9; const g = 6 + ph * 34; SX.globalAlpha = a * (1 - ph) * .9; SX.lineWidth = 5; const p2 = new Path2D(); p2.roundRect(x - g, y - g, w + g * 2, h + g * 2, rad + g); SX.stroke(p2);
+    SX.restore();
+  }
+  // الإصبع
+  for (const f of TAPS) {
+    const [ti, tt, to, st, sel, drag] = f; if (t < ti - .05 || t > to + .2) continue; const r = rectOf(st, sel); if (!r) continue;
+    let [cx, cy] = ctr(r); if (drag) cx += drag[0] * E.io(prog(t, drag[1], drag[2])); if (drag) cy += 13 * prog(t, drag[1], drag[2]);
+    const kin = at(t, ti - .05, ti + .3, 'out3'), kout = at(t, to, to + .2);
+    const ox = (1 - kin) * 70 + kout * 60, oy = (1 - kin) * 160 + kout * 140;
+    const press = tt > 0 ? Math.exp(-Math.pow((t - tt) / .07, 2)) : (drag ? (t > drag[1] - .1 && t < drag[2] + .05 ? 1 : 0) * .6 : .15 + .15 * Math.sin((t - ti) * 9));
+    const sc = 1.6 * (1 - press * .14);
+    SX.save(); SX.globalAlpha = kin * (1 - kout);
+    if (tt > 0 && t >= tt) { const k = prog(t, tt, tt + .45); SX.strokeStyle = `rgba(255,255,255,${(1 - k) * .9})`; SX.lineWidth = 6; SX.beginPath(); SX.arc(cx * K, cy * K, 20 + k * 70, 0, 6.283); SX.stroke(); SX.fillStyle = `rgba(242,201,107,${(1 - k) * .35})`; SX.fill(); }
+    SX.translate(cx * K + ox, cy * K + oy); SX.scale(sc, sc); SX.shadowColor = 'rgba(0,0,0,.55)'; SX.shadowBlur = 18; SX.shadowOffsetY = 10 * (1 - press);
+    SX.drawImage(handImg, -24, -4, 64, 80); SX.restore();
+  }
+  scrTex.needsUpdate = true;
+}
+
+// ================= الإطار =================
+function camAt(t) {
+  const K = CAM.map(c => [c[0], c.slice(1)]);
+  const v = kf(t, K);
+  let [s, fx, fy, rx, ry] = v;
+  // دخول الجوال
+  const rise = at(t, 4.9, 6.4, 'out5');
+  let y = lerp(-3.2, 0, rise);
+  // لفّات
+  let spin = 0; for (const [a, b] of SPINS) spin += 360 * E.io3(prog(t, a, b));
+  ry += spin;
+  // تنفّس خفيف
+  rx += Math.sin(t * .7) * 2.2; ry += Math.cos(t * .45) * 5 + Math.sin(t * .23) * 3;
+  let x = 0, ox = .17;
+  // الخاتمة: الجوال يروح يمين ويصغر بجانب الباركود
+  const e = at(t, 55.0, 56.0, 'io3');
+  ox = lerp(.17, .035, e); s *= lerp(1, .78, e); ry += e * -14;
+  y -= at(t, 57.6, 58.6, 'out5') * .18;
+  return { s, fx, fy, rx, ry: ry, y, x, ox };
+}
+function isAndroid(t) { return t > (14.25 + 14.95) / 2 && t < (17.85 + 18.55) / 2; }
+
+window.renderAt = async (t) => {
+  await document.fonts.ready;
+  const c = camAt(t);
+  const andr = isAndroid(t);
+  isl.visible = !andr; hole.visible = andr; metal.color.set(andr ? '#3a3a40' : '#c9a866'); bump.visible = true;
+  pose(c);
+  await drawScreen(t);
+  renderer.render(scene, camera);
+  const sc = screenToPx(.5, .5);
+  drawBG(t, [sc[0], sc[1], 620 * c.s, at(t, 4.8, 6.4) ]);
+  drawLogo(t);
+  drawText(t);
+  return true;
+};
+await Promise.all([load('L0'), new Promise(r => handImg.complete ? r() : handImg.onload = r), new Promise(r => iconImg.complete ? r() : iconImg.onload = r)]);
+await document.fonts.load('700 40px A'); await document.fonts.load('400 40px R'); await document.fonts.load('700 40px R'); await document.fonts.load('600 40px L');
+window.READY = true;
+</script></body></html>

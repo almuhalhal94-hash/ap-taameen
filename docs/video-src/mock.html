@@ -1,0 +1,98 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<style>
+@font-face{font-family:R;font-weight:400;src:url(a/readex-pro-arabic-400-normal.woff2)}
+@font-face{font-family:R;font-weight:700;src:url(a/readex-pro-arabic-700-normal.woff2)}
+@font-face{font-family:L;font-weight:600;src:url(a/readex-pro-latin-600-normal.woff2)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;font-family:-apple-system,R,L,sans-serif;background:#000}
+.abs{position:absolute}
+#page{position:absolute;inset:0;overflow:hidden}
+#page img{width:390px;display:block}
+.stat{position:absolute;top:0;left:0;right:0;height:50px;display:flex;justify-content:space-between;align-items:center;padding:14px 30px 0;color:#fff;font:600 16px L;z-index:9;direction:ltr}
+/* safari */
+.sbar{position:absolute;left:0;right:0;bottom:0;height:104px;background:rgba(30,30,32,.92);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.08);z-index:5}
+.url{position:absolute;left:14px;right:14px;top:8px;height:44px;border-radius:13px;background:rgba(118,118,128,.28);color:#fff;font:600 16px L;display:flex;align-items:center;justify-content:center;direction:ltr;gap:6px}
+.tools{position:absolute;left:0;right:0;top:58px;height:40px;display:flex;justify-content:space-around;align-items:center;direction:ltr}
+.tools i{width:26px;height:26px;display:block}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:6}
+.shs{position:absolute;left:0;right:0;bottom:0;height:600px;background:#1c1c1e;border-radius:14px 14px 0 0;z-index:7;color:#fff}
+.shs .hd{display:flex;align-items:center;gap:12px;padding:18px 18px 14px;border-bottom:1px solid #333}
+.shs .hd img{width:52px;height:52px;border-radius:12px}
+.shs .hd b{font:700 15px R;display:block}.shs .hd small{font:600 13px L;color:#8e8e93}
+.apps{display:flex;gap:16px;padding:16px 18px;border-bottom:1px solid #333}
+.apps div{width:60px;text-align:center;font:400 11px R;color:#ddd}.apps span{display:block;width:60px;height:60px;border-radius:15px;margin-bottom:6px;background:linear-gradient(#3a3a3c,#2c2c2e)}
+.grp{margin:14px 16px 0;background:#2c2c2e;border-radius:12px;overflow:hidden}
+.row{height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font:400 16px R;border-bottom:1px solid #3a3a3c}
+.row:last-child{border:0}.row svg{width:22px;height:22px}
+.row.hl{background:#3a3a3c}
+/* add to home */
+.addp{position:absolute;inset:0;background:#1c1c1e;z-index:8;color:#fff}
+.nav{height:56px;margin-top:50px;display:flex;justify-content:space-between;align-items:center;padding:0 16px;font:400 17px R}
+.nav b{font:700 17px R}.nav .blue{color:#0a84ff}
+.card2{margin:20px 16px;background:#2c2c2e;border-radius:12px;display:flex;align-items:center;gap:14px;padding:14px}
+.card2 img{width:60px;height:60px;border-radius:14px}
+.card2 .f{flex:1;border-bottom:1px solid #3a3a3c;padding-bottom:10px;font:400 17px R}
+.card2 small{display:block;font:600 13px L;color:#8e8e93;margin-top:10px;direction:ltr;text-align:right}
+.note{margin:0 30px;font:400 13px R;color:#8e8e93;line-height:1.6}
+/* home */
+.home{position:absolute;inset:0;z-index:4;background:radial-gradient(500px 700px at 30% 20%,#5a2a40,#1d1030 55%,#0b0814)}
+.grid{position:absolute;top:80px;left:22px;right:22px;display:grid;grid-template-columns:repeat(4,1fr);gap:26px 18px;direction:ltr}
+.ic{text-align:center;font:400 12px R;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.ic span{display:block;width:62px;height:62px;margin:0 auto 6px;border-radius:15px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px)}
+.ic img{width:62px;height:62px;border-radius:15px;display:block;margin:0 auto 6px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.dock{position:absolute;left:14px;right:14px;bottom:24px;height:92px;border-radius:30px;background:rgba(255,255,255,.18);display:flex;justify-content:space-around;align-items:center}
+.dock span{width:62px;height:62px;border-radius:15px;background:rgba(255,255,255,.22)}
+/* chrome */
+.cbar{position:absolute;left:0;right:0;top:36px;height:60px;background:#1f1f1f;z-index:5;display:flex;align-items:center;gap:10px;padding:0 10px;direction:ltr}
+.curl{flex:1;height:42px;border-radius:21px;background:#303134;color:#e8eaed;font:600 15px L;display:flex;align-items:center;padding:0 16px;gap:8px}
+.dots{width:40px;height:40px;display:grid;place-items:center}
+.menu{position:absolute;top:44px;right:8px;width:250px;background:#2d2e30;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.6);z-index:7;color:#e8eaed;padding:8px 0;transform-origin:top right}
+.mi{height:48px;display:flex;align-items:center;gap:16px;padding:0 18px;font:400 15px R}
+.mi.hl{background:#3c3d40}.mi i{width:20px;height:20px;border-radius:4px;background:#5f6368;display:block}
+.dlg{position:absolute;left:28px;right:28px;top:300px;background:#2d2e30;border-radius:26px;z-index:8;color:#e8eaed;padding:24px}
+.dlg h4{font:700 20px R;margin-bottom:18px}.dlg .ap{display:flex;gap:14px;align-items:center;margin-bottom:24px}
+.dlg img{width:48px;height:48px;border-radius:12px}.dlg small{display:block;font:600 13px L;color:#9aa0a6;direction:ltr;text-align:right}
+.dlg .bt{display:flex;justify-content:flex-start;gap:10px;direction:ltr}
+.dlg .bt span{font:700 15px R;padding:10px 20px;border-radius:20px;color:#8ab4f8}
+.dlg .bt .pri{background:#8ab4f8;color:#202124}
+.astat{position:absolute;top:0;left:0;right:0;height:36px;background:#1f1f1f;z-index:9;color:#e8eaed;font:600 14px L;display:flex;justify-content:space-between;align-items:center;padding:0 20px;direction:ltr}
+/* camera */
+.cam{position:absolute;inset:0;background:#111;z-index:3;overflow:hidden}
+.cam .qr{position:absolute;left:50%;top:44%;width:300px;transform:translate(-50%,-50%) rotate(-3deg);border-radius:14px;filter:brightness(.92)}
+.cam .blur{position:absolute;inset:-40px;background:url(a/qr_poster.png) center/cover;filter:blur(24px) brightness(.45)}
+.brk{position:absolute;left:50%;top:44%;width:250px;height:250px;transform:translate(-50%,-50%);z-index:4}
+.brk i{position:absolute;width:44px;height:44px;border:5px solid #ffd60a}
+.pill{position:absolute;left:50%;top:640px;transform:translateX(-50%);background:#ffd60a;color:#000;border-radius:14px;padding:10px 18px;font:700 14px R;z-index:5;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.pill b{font:600 14px L}
+.shutter{position:absolute;left:50%;bottom:40px;width:76px;height:76px;margin-left:-38px;border-radius:50%;border:5px solid #fff;z-index:5}
+.shutter:after{content:"";position:absolute;inset:4px;border-radius:50%;background:#fff}
+.camtop{position:absolute;top:54px;left:0;right:0;text-align:center;color:#ffd60a;font:600 13px L;z-index:5}
+</style></head><body>
+<div class="stat" id="stat"><span>9:41</span><span>●●● ▮</span></div>
+<div id="root"></div>
+<script>
+const q=new URLSearchParams(location.search), S=q.get('s'), k=+(q.get('k')??1);
+const sh='<svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="1.8"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8"/></svg>';
+const plus='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+const gen=c=>`<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="12" cy="12" r="${c}"/></svg>`;
+const ease=x=>1-Math.pow(1-x,3);
+const login='<div id="page" style="top:0"><img src="st/L0.jpg"></div>';
+const safari=(hl)=>`${login}<div class="sbar"><div class="url">🔒 ap-taameen.web.app</div><div class="tools"><i>${gen(0)}</i><i style="opacity:.5">‹</i><i id="share">${sh}</i><i>${gen(5)}</i><i>${gen(6)}</i></div></div>`;
+const html={
+ cam0:`<div class="cam"><div class="blur"></div><img class="qr" src="a/qr.png"><div class="camtop">PHOTO</div><div class="shutter"></div></div>`,
+ cam1:`<div class="cam"><div class="blur"></div><img class="qr" src="a/qr.png"><div class="brk">${[[0,0,'border-right:0;border-bottom:0;border-radius:12px 0 0 0'],[1,0,'border-left:0;border-bottom:0;border-radius:0 12px 0 0'],[0,1,'border-right:0;border-top:0;border-radius:0 0 0 12px'],[1,1,'border-left:0;border-top:0;border-radius:0 0 12px 0']].map(([x,y,s])=>`<i style="${x?'right':'left'}:0;${y?'bottom':'top'}:0;${s}"></i>`).join('')}</div><div class="pill" id="pill">🧭 افتح في سفاري <b>ap-taameen.web.app</b></div><div class="camtop">PHOTO</div><div class="shutter"></div></div>`,
+ sa0:safari(),
+ sa1:safari()+`<div class="dim" style="opacity:${k}"></div><div class="shs" style="transform:translateY(${(1-ease(k))*100}%)"><div class="hd"><img src="a/icon512.png"><div><b>تأمين وتبديل — ابن رشد</b><small>ap-taameen.web.app</small></div></div><div class="apps"><div><span></span>AirDrop</div><div><span></span>رسائل</div><div><span></span>بريد</div><div><span></span>ملاحظات</div></div>
+  <div class="grp"><div class="row">نسخ ${gen(5)}</div><div class="row">إضافة إلى قائمة القراءة ${gen(6)}</div><div class="row">إضافة إشارة مرجعية ${gen(7)}</div></div>
+  <div class="grp"><div class="row ${q.get('hl')?'hl':''}" id="a2h">إضافة إلى الشاشة الرئيسية ${plus}</div><div class="row">طباعة ${gen(6)}</div></div></div>`,
+ sa2:`<div class="addp" style="transform:translateY(${(1-ease(k))*100}%)"><div class="nav"><span class="blue">إلغاء</span><b>إضافة إلى الشاشة الرئيسية</b><span class="blue" id="add" style="font-weight:700">إضافة</span></div><div class="card2"><img src="a/icon512.png"><div style="flex:1"><div class="f">تأمين وتبديل</div><small>ap-taameen.web.app/app/</small></div></div><p class="note">ستتم إضافة رمز إلى الشاشة الرئيسية لتتمكن من الوصول بسرعة إلى موقع الويب هذا.</p></div>`,
+ home:`<div class="home"><div class="grid">${Array.from({length:19},(_,i)=>`<div class="ic"><span></span>&nbsp;</div>`).join('')}<div class="ic" id="appic" style="transform:scale(${q.get('pop')??1});opacity:${Math.min(1,(+(q.get('pop')??1))*1.5)}"><img src="a/icon512.png">تأمين وتبديل</div></div><div class="dock"><span></span><span></span><span></span><span></span></div></div>`,
+ ch0:`<div class="astat"><span>9:41</span><span>▼ ▮</span></div><div id="page" style="top:96px"><img src="st/L0.jpg" style="margin-top:-50px"></div><div class="cbar"><div class="curl">🔒 ap-taameen.web.app/app</div><div class="dots" id="dots"><svg width="6" height="22" viewBox="0 0 6 22"><circle cx="3" cy="3" r="2.6" fill="#e8eaed"/><circle cx="3" cy="11" r="2.6" fill="#e8eaed"/><circle cx="3" cy="19" r="2.6" fill="#e8eaed"/></svg></div></div>`,
+};
+html.ch1=html.ch0+`<div class="menu" style="top:${48+36}px;transform:scale(${0.85+0.15*ease(k)});opacity:${ease(k)}"><div class="mi"><i></i>علامة تبويب جديدة</div><div class="mi"><i></i>السجلّ</div><div class="mi"><i></i>التنزيلات</div><div class="mi"><i></i>الإشارات المرجعية</div><div class="mi ${q.get('hl')?'hl':''}" id="inst"><i style="background:#8ab4f8"></i>تثبيت التطبيق</div><div class="mi"><i></i>مشاركة…</div><div class="mi"><i></i>الإعدادات</div></div>`;
+html.ch2=html.ch0+`<div class="dim" style="opacity:${k}"></div><div class="dlg" style="transform:scale(${0.9+0.1*ease(k)});opacity:${ease(k)}"><h4>هل تريد تثبيت التطبيق؟</h4><div class="ap"><img src="a/icon512.png"><div><b style="font:700 16px R">تأمين وتبديل</b><small>ap-taameen.web.app</small></div></div><div class="bt"><span class="pri" id="instbtn">تثبيت</span><span>إلغاء</span></div></div>`;
+html.ahome=`<div class="astat" style="background:transparent"><span>9:41</span><span>▼ ▮</span></div>`+html.home.replace('class="home"','class="home" style="background:radial-gradient(500px 700px at 70% 20%,#2a4a5a,#10202a 55%,#060c10)"').replace(/border-radius:15px/g,'');
+document.getElementById('root').innerHTML=html[S]||'';
+if(S==='ahome'||S.startsWith('ch')) document.getElementById('stat').style.display='none';
+if(S==='ahome'){document.querySelectorAll('.ic span,.ic img').forEach(e=>e.style.borderRadius='50%');}
+</script></body></html>

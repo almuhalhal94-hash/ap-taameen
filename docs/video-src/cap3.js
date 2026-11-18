@@ -1,0 +1,13 @@
+const {chromium}=require('playwright');const fs=require('fs');const OUT=__dirname+'/mk';fs.rmSync(OUT,{recursive:true,force:true});fs.mkdirSync(OUT);const R={};
+(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:390,height:844},deviceScaleFactor:3});
+const go=async(n,qs)=>{await p.goto('file://'+__dirname+'/mock.html?'+qs);await p.waitForTimeout(250);await p.screenshot({path:`${OUT}/${n}.jpg`,type:'jpeg',quality:93});
+ R[n]=await p.evaluate(()=>{const o={};for(const id of ['share','a2h','add','appic','dots','inst','instbtn','pill']){const e=document.getElementById(id);if(e){const r=e.getBoundingClientRect();o[id]=[r.x,r.y,r.width,r.height];}}return o;});process.stdout.write(n+' ');};
+await go('cam0','s=cam0');await go('cam1','s=cam1');await go('sa0','s=sa0');
+for(let i=0;i<=8;i++) await go('sa1_'+i,'s=sa1&k='+(i/8));
+await go('sa1_hl','s=sa1&k=1&hl=1');
+for(let i=0;i<=8;i++) await go('sa2_'+i,'s=sa2&k='+(i/8));
+for(let i=0;i<=8;i++) await go('home_'+i,'s=home&pop='+(i/8));
+await go('ch0','s=ch0');for(let i=0;i<=6;i++) await go('ch1_'+i,'s=ch1&k='+(i/6));await go('ch1_hl','s=ch1&k=1&hl=1');
+for(let i=0;i<=6;i++) await go('ch2_'+i,'s=ch2&k='+(i/6));
+for(let i=0;i<=8;i++) await go('ahome_'+i,'s=ahome&pop='+(i/8));
+fs.writeFileSync(OUT+'/rects.json',JSON.stringify(R));await b.close();console.log('ok')})();

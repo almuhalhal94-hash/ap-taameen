@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التأمين والتبديل — إدارة ابن رشد</title>
+<link rel="icon" href="app/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="app/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="إدارة التأمين">
+<meta name="description" content="توزيع تأمين الحصص على المعلمين بعدالة وطباعة كشف التأمين اليومي للتوقيع — مدرسة ابن رشد الإعدادية للبنين">
+<meta name="theme-color" content="#7a0a16">
+<link rel="stylesheet" href="style.css">
+<script src="gate.js"></script>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="moe-strip"><img src="assets/header.jpg" alt="مملكة البحرين — وزارة التربية والتعليم — إدارة العمليات التعليمية المنطقة 3 — مدرسة ابن رشد الإعدادية للبنين" width="1200" height="226"></div>
+
+  <header class="hero">
+    <div class="hero-in">
+      <div>
+        <p class="hero-kicker">مكتب المدير المساعد</p>
+        <h1>التأمين والتبديل</h1>
+      </div>
+      <div class="hero-date" id="heroDate"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab active" data-tab="today"><i>🛡</i>التأمين</button>
+    <button role="tab" class="tab" data-tab="swaps"><i>⇄</i>التبديل</button>
+    <button role="tab" class="tab" data-tab="app"><i>📲</i>الردود <span class="nbadge" id="appBadge" hidden></span></button>
+    <button role="tab" class="tab" data-tab="stats"><i>📊</i>السجل</button>
+    <button role="tab" class="tab" data-tab="teachers"><i>👥</i>المعلمون</button>
+    <button role="tab" class="tab" data-tab="settings"><i>⚙</i>الإعدادات</button>
+  </nav>
+
+  <div class="alerts" id="appAlerts" hidden></div>
+  <main>
+    <div id="dateArea">
+      <div class="card date-card">
+        <label class="field">
+          <span>تاريخ التأمين</span>
+          <input type="date" id="dateInput">
+        </label>
+        <div class="day-info" id="dayInfo"></div>
+        <div class="saved-flag" id="savedFlag" hidden>✓ محفوظ تلقائيًا في السجل</div>
+      </div>
+
+      <div id="weekendMsg" class="card empty" hidden>
+        <strong>هذا اليوم عطلة نهاية الأسبوع</strong>
+        <p>اختر يومًا من الأحد إلى الخميس.</p>
+      </div>
+    </div>
+    <!-- ============ تأمين اليوم ============ -->
+    <section class="panel active" id="tab-today">
+      <div id="dayWork">
+        <div class="day-sum" id="daySum"></div>
+        <div class="card" id="absCard">
+          <div class="card-head">
+            <h2><span class="step">١</span> من الغائب اليوم؟</h2>
+            <input type="search" id="absSearch" class="search" placeholder="ابحث باسم المعلم…">
+          </div>
+          <p class="hint">اضغط اسم الغائب، والتأمين يتوزّع تلقائيًا تحت.</p>
+          <div id="absList" class="dept-list"></div>
+        </div>
+
+        <div class="card" id="absDetail" hidden>
+          <h2 class="sub-h">حصص الغائبين <small>— شيل الحصة اللي ما يحتاج لها تأمين (غياب جزئي)</small></h2>
+          <div id="absSlots"></div>
+        </div>
+
+        <p class="actions-note" id="needNote"></p>
+
+        <div class="card" id="resultCard" hidden>
+          <div class="card-head">
+            <h2><span class="step">٢</span> التأمين</h2>
+            <div class="mode-seg" role="group" aria-label="طريقة التوزيع"><button data-key="coverMode" data-mode="auto">⚡ تلقائي</button><button data-key="coverMode" data-mode="manual">✋ يدوي</button></div>
+          </div>
+          <p class="hint mode-note" id="coverModeNote"></p>
+          <div class="cover-list" id="resTable"></div>
+          <div class="load-today" id="loadToday"></div>
+          <div class="send-bar" id="sendBar">
+            <div class="push-stat" id="pushStat"></div>
+            <div class="send-head"><span class="step">٣</span><div><b>إبلاغ المعلمين</b><small>بعد ما تراجع التأمين والتبديل، سوِّ الخطوتين:</small></div></div>
+            <div class="send-steps">
+              <div class="ss"><span class="n">١</span><div class="ss-t"><b>أرسل للتطبيق</b><small>كل معلم يوصله تكليفه في جواله، ويستلم أو يعتذر منه</small></div><button class="btn send big" data-send-now>📲 إرسال للمعلمين</button></div>
+              <div class="ss wa-s"><span class="n">٢</span><div class="ss-t"><b>انسخ رسالة قروب الواتساب</b><small>الصقها في قروب المعلمين عشان يوصلهم الإشعار على طول</small></div><button class="btn wa big" id="btnGroup">💬 نسخ رسالة القروب</button></div>
+            </div>
+            <details class="wa-prev" id="waPrevBox"><summary>👁 معاينة رسالة القروب</summary><div class="wa-chat"><div class="wa-bub" id="waPrev"></div></div></details>
+            <div class="send-more">
+              <button class="btn" id="btnPdf">تنزيل الكشف PDF</button>
+              <button class="btn" id="btnPrint" hidden>طباعة</button>
+              <button class="link" id="btnRedistribute" title="يلغي اختياراتك اليدوية ويعيد التوزيع">↻ إعادة التوزيع</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ التبديل ============ -->
+    <section class="panel" id="tab-swaps">
+      <div id="swapWork">
+        <div class="card">
+          <div class="card-head"><h2>طلب تبديل أو استئذان</h2><button class="btn wa" data-group title="ينسخ رسالة التأمين والتبديل لليوم لقروب المعلمين">💬 نسخ رسالة القروب</button></div>
+          <p class="hint">اختر المعلم ووقت خروجه ورجوعه، والنظام يبادل حصصه مع زميل يدرّس نفس الصف في وقت يكون فيه المعلم موجود. اللي ما له بديل يروح للتأمين.</p>
+          <div class="grid2">
+            <label class="field"><span>المعلم</span><select id="swTeacher"></select></label>
+            <label class="field"><span>السبب (اختياري)</span><input type="text" id="swReason" placeholder="مثال: موعد مستشفى"></label>
+          </div>
+          <div class="sw-mode" id="swModeWrap" hidden>
+            <div class="sw-time">
+              <label class="field"><span>يطلع من بداية الحصة</span><select id="swFrom"></select></label>
+              <label class="field"><span>ويرجع</span><select id="swTo"></select></label>
+            </div>
+            <p class="hint" id="swCount"></p>
+          </div>
+          <div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btnSwap" disabled>سجّل الطلب</button></div>
+          <div class="mode-row"><span>اختيار البديل:</span><div class="mode-seg" role="group" aria-label="طريقة التوزيع"><button data-key="swapMode" data-mode="auto">⚡ تلقائي</button><button data-key="swapMode" data-mode="manual">✋ أختار بنفسي</button></div></div><p class="hint mode-note" id="swapModeNote"></p>
+        </div>
+        <div class="actions" id="swapBar" hidden>
+          <button class="btn send" data-send-now>📲 إرسال للمعلمين</button>
+          <button class="btn primary" id="btnSwapPdf">تنزيل كشف التبديل PDF</button>
+          <button class="btn" id="btnSwapPrint" hidden>طباعة</button>
+        </div>
+        <div id="swapList"></div>
+      </div>
+    </section>
+
+    <!-- ============ الإحصائيات ============ -->
+    <section class="panel" id="tab-app">
+      <div class="card">
+        <div class="card-head">
+          <div><h2>تطبيق المعلمين</h2><p class="hint" id="syncNote">جاري الاتصال…</p></div>
+          <div class="btn-row"><button class="btn primary" id="btnSend">إرسال تأمين اليوم للمعلمين</button></div>
+        </div>
+        <p class="hint" id="sendNote"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>🔔 حالة الإشعارات عند المعلمين</h2><p class="hint">تتحدث لحالها كل ما يفتح المعلم التطبيق. «مفعّلة» يعني التنبيه يوصل جواله حتى والتطبيق مسكّر.</p></div></div>
+        <div id="pushList" class="push-list"><p class="muted">جاري التحميل…</p></div>
+      </div>
+      <div class="card" id="reqCard">
+        <div class="card-head"><div><h2>⇄ طلبات المعلمين: التبديل وتأمين الغياب</h2><p class="hint">«⚡ تبديل تلقائي» يرتّب للمعلم زميلًا يدرّس نفس الصف. و«✓ اعتماد وتوزيع حصصه» لطلب الغياب بعذر رسمي: يسجّله غائبًا في يومه ويوزّع حصصه بنفس قواعد البرنامج. والرد يوصله على جواله.</p></div></div>
+        <div id="reqAdmin" class="resp-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>الردود — <span id="respDay"></span></h2><div class="seg" id="respFilter"><button class="on" data-f="all">الكل</button><button data-f="pending">بانتظار</button><button data-f="accepted">قبل</button><button data-f="refused">اعتذر</button></div></div>
+        <div id="respList" class="resp-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>الاستيضاحات</h2><div class="btn-row"><button class="btn" id="btnNewExp">استيضاح جديد</button></div></div>
+        <div id="expList" class="exp-list"></div>
+      </div>
+      <div class="card">
+        <h2>المحادثات</h2>
+        <div class="chat-wrap"><div id="chatPeople" class="chat-people"></div><div id="chatThread" class="chat-thread"><p class="muted">اختر معلمًا.</p></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><h2>رموز دخول المعلمين</h2><p class="hint">رابط واحد للجميع، ولكل معلم رمز من 6 أرقام يفتح له مهامه فقط. والمشرف نفس رمزه يفتح له تكليفاته ومتابعة صفوف إشرافه مع بعض. «نسخ الرسالة» يجهّز لك رسالة جاهزة ترسلها للمعلم.</p></div>
+          <div class="btn-row"><button class="btn primary" id="btnLinks">تجهيز الرموز</button><button class="btn" id="btnCopyAll">نسخ كل الرموز</button><button class="btn wa" id="btnMsgPage" title="صفحة فيها رسالة كل معلم مستقلة، للمدير">📄 صفحة رسائل المعلمين</button><button class="btn" id="btnRenew" title="لو انتشر رمز">تجديد الرموز</button></div></div>
+        <div id="linkList" class="link-list"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-stats">
+      <div class="card" id="cloudStatsCard">
+        <div class="card-head"><div><h2>📊 إحصائية التأمين — لكل الأجهزة</h2><p class="hint">من التكليفات المرسلة للمعلمين في السحابة، فتطلع نفسها في أي جهاز. (الملغاة ما تنحسب)</p></div>
+          <div class="seg" id="csRange"><button class="on" data-r="week">هذا الأسبوع</button><button data-r="month">هذا الشهر</button><button data-r="all">الكل</button></div></div>
+        <div class="kpis" id="csKpis"></div>
+        <div id="csTable" class="cs-table"></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>عدد مرات التأمين لكل معلم</h2>
+          <select id="statsSort" class="select-sm">
+            <option value="count">الأكثر تأمينًا</option>
+            <option value="name">حسب الاسم</option>
+            <option value="dept">حسب القسم</option>
+          </select>
+        </div>
+        <p class="hint">النسبة = تأمينات المعلم ÷ إجمالي حصص التأمين المحفوظة. «العبء» يقارن تأميناته بنصابه الأسبوعي.</p>
+        <div class="table-wrap"><table class="stats-table" id="statsTable"></table></div>
+      </div>
+      <div class="card">
+        <h2>سجل أيام التأمين</h2>
+        <div id="historyList"></div>
+      </div>
+    </section>
+
+    <!-- ============ المعلمون ============ -->
+    <section class="panel" id="tab-teachers">
+      <div class="card">
+        <div class="card-head">
+          <h2>المعلمون وأيام التواجد</h2>
+          <input type="search" id="tSearch" class="search" placeholder="ابحث…">
+        </div>
+        <p class="hint">الأيام مأخوذة من الجدول العام: اليوم اللي ما فيه للمعلم أي حصة أو اجتماع يُعتبر غير متواجد فيه. تقدر تعدّلها يدويًا، أو تعلّم المعلم «مفرّغ كليًا» (منتقل لمدرسة أخرى) فما يدخل في التأمين أبدًا.</p>
+        <div id="teacherList"></div>
+      </div>
+    </section>
+
+    <!-- ============ الإعدادات ============ -->
+    <section class="panel" id="tab-settings">
+      <div class="card">
+        <h2>بيانات الكشف المطبوع</h2>
+        <div class="grid2">
+          <label class="field"><span>اسم مدير المدرسة</span><input type="text" id="setPrincipal" placeholder="يظهر أسفل الكشف"></label>
+          <label class="field"><span>اسم المدير المساعد</span><input type="text" id="setAssistant" placeholder="اختياري"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h2>قواعد التوزيع</h2>
+        <label class="field inline"><span>أقصى عدد تأمين للمعلم في اليوم</span>
+          <select id="setMax"><option>1</option><option>2</option><option>3</option></select>
+        </label>
+        <label class="check"><input type="checkbox" id="setDept"> الأولوية لمعلمي نفس القسم</label>
+        <label class="check"><input type="checkbox" id="setBreak"> تأمين مراقبة الفسحة للغائب</label>
+        <label class="check"><input type="checkbox" id="setConsec"> تجنّب أن يصير عند المعلم ٤ متتالية أو أكثر (الحصص مع مراقبة الفسحة) — وقتها يتقدّم غير القسم</label>
+      </div>
+      <div class="card">
+        <h2>اعتبارات التوزيع المعتمدة</h2>
+        <p class="hint">هذي القواعد اللي يمشي عليها البرنامج في كل توزيع.</p>
+        <div class="rules" id="rolesSum"></div>
+        <h3 class="sub-h" style="margin-top:22px">تعديل الحالات الخاصة</h3>
+        <p class="hint">اضغط اسم المعلم يتغيّر: <b>عادي ← منسق (للضرورة فقط) ← يدوي فقط (ما ينختار تلقائيًا، الإدارة تختاره بنفسها) ← عادي</b>. معلمو الرياضة «يدوي فقط»، و«مستثنى» ما يدخل التأمين أبدًا (لظرف صحي). والمشرفون يأمّنون صفوف مراحلهم بس، وتحددها من «المعلمون».</p>
+        <div id="roleList" class="dept-list"></div>
+        <button class="btn" id="btnRolesReset" style="margin-top:10px">↺ إرجاع القائمة المعتمدة</button>
+      </div>
+      <div class="card">
+        <h2>الإدارة والطوارئ (يؤمّنون عند الحاجة)</h2>
+        <p class="hint">هذي الأسماء تطلع لك بزر «🛡 الإدارة تؤمّن» في كل حصة وفي تحكم الإدارة، وتختار منها اللي يأمّن. وإذا ما فيه معلم متاح أو اعتذر الكل، الحصة تروح لأول اسم فاضي هنا. اسم في كل سطر.</p>
+        <label class="field"><span>الأسماء</span><textarea id="setEmg" rows="5"></textarea></label>
+      </div>
+      <div class="card">
+        <h2>النسخ الاحتياطي</h2>
+        <p class="hint" id="storageNote">البيانات محفوظة في هذا المتصفح. خذ نسخة احتياطية بين فترة وفترة، وتقدر تسترجعها في أي جهاز.</p>
+        <div class="btn-row">
+          <button class="btn" id="btnExport">تنزيل نسخة احتياطية</button>
+          <label class="btn file-btn">استرجاع نسخة<input type="file" id="fileImport" accept="application/json,.json"></label>
+          <button class="btn danger" id="btnReset">مسح السجل</button>
+        </div>
+      </div>
+      <p class="source-note" id="sourceNote"></p>
+    </section>
+  </main>
+
+  <footer class="foot">مدرسة ابن رشد الإعدادية للبنين — علمًا نتميّز، قيمًا نسمو، وطنًا نبني<span class="credit">إعداد: أ. طلال سعود المهلهل</span></footer>
+</div>
+
+<!-- ============ كشف الطباعة ============ -->
+<div id="printSheet" class="print-sheet" aria-hidden="true"></div>
+
+<div id="pickModal" class="modal sheet" hidden>
+  <div class="modal-box pick-box" role="dialog" aria-modal="true" aria-labelledby="pkHead">
+    <button class="pk-x" data-pkclose aria-label="إغلاق">✕</button>
+    <div class="pk-head" id="pkHead"></div>
+    <p class="pk-note">مرتّبين من الأنسب: نفس القسم، ثم الأقل تأمينًا، ثم الأخف نصابًا اليوم.</p>
+    <div class="pk-list" id="pkList"></div>
+    <div class="pk-foot"><button class="btn danger" id="pkRefuse"></button><button class="link" id="pkNone">بدون تأمين</button></div>
+  </div>
+</div>
+<div id="modal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalMsg">
+    <p id="modalMsg"></p>
+    <div class="btn-row"><button class="btn primary" id="modalOk">نعم</button><button class="btn" id="modalNo">إلغاء</button></div>
+  </div>
+</div>
+
+<div id="expModal" class="modal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true" aria-labelledby="expTitle">
+    <h2 id="expTitle">استيضاح</h2>
+    <label class="field"><span>المعلم</span><select id="expTeacher"></select></label>
+    <label class="field"><span>الموضوع</span><select id="expReason">
+      <option value="cover">عدم حضور حصة التأمين</option><option value="duty">عدم الحضور لمراقبة الفسحة</option><option value="swap">رفض التبديل</option><option value="other">أخرى</option></select></label>
+    <label class="field"><span>التفاصيل (اليوم والحصة)</span><input type="text" id="expRef"></label>
+    <label class="field"><span>نص الاستيضاح</span><textarea id="expBody" rows="6"></textarea></label>
+    <div class="btn-row"><button class="btn primary" id="expSend">إرسال للمعلم</button><button class="btn" id="expCancel">إلغاء</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/vendor/html2canvas.min.js"></script>
+<script src="assets/vendor/jspdf.umd.min.js"></script>
+<script src="data.js"></script>
+<script src="duties.js"></script>
+<script src="app.js"></script>
+<div id="newVer" class="newver" hidden>✨ فيه تحديث جديد للبرنامج <button class="btn sm" onclick="location.reload()">حدّث الآن</button></div>
+<script>
+// يتأكد كل دقيقة إذا انرفعت نسخة جديدة، ويطلب التحديث عشان ما تشتغل على نسخة قديمة
+(function () {
+  let base = null;
+  const sig = () => Promise.all(['app.js', 'admin-sync.js', 'index.html'].map(f => fetch(f, { cache: 'no-store' }).then(r => r.text()).catch(() => ''))).then(a => a.map(x => x.length).join('-'));
+  sig().then(v => base = v);
+  setInterval(() => sig().then(v => { if (base && v && v !== base && !v.startsWith('0')) document.getElementById('newVer').hidden = false; }), 60000);
+})();
+</script>
+<script src="firebase-config.js"></script>
+<script src="sync.js"></script>
+<script src="admin-sync.js"></script>
+</body>
+</html>
