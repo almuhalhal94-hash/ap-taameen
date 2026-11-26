@@ -84,13 +84,13 @@
 
   let busy = false, again = false, NUDGE = false;
   const sentDays = () => (A.settings.sentDays = A.settings.sentDays || {});
-  async function publish(manual) {
+  async function publish(manual, nudge = true) {
     if (busy) { again = true; return; }
     busy = true;
     try {
       const iso = A.date, want = desired(), ids = new Set(want.map(w => w.id));
       if (manual && !want.length) { A.toast('ما فيه تأمين أو تبديل لهذا اليوم'); return; }
-      NUDGE = !!manual && !!sentDays()[iso];
+      NUDGE = !!manual && nudge && !!sentDays()[iso];
       for (const w of want) await S.tx('assign/' + w.id, cur => merged(cur, w));
       NUDGE = false;
       const gone = docs.filter(d => d.date === iso && !ids.has(d.id) && d.status !== 'cancelled');
@@ -103,7 +103,7 @@
       if (manual) A.toast(`✓ تم الإرسال لـ ${new Set(want.map(w => w.to).filter(Boolean)).size} معلم — يطلع لهم في التطبيق الحين`);
     } catch (e) { console.warn(e); A.toast('تعذّر الإرسال — تأكد من الاتصال'); }
     finally { busy = false; NUDGE = false; if (again) { again = false; publish(false); } }
-    renderSend();
+    renderSend(); refreshBar();
   }
   // تأكيد للمدير المساعد قبل الإرسال لو فيه مؤمّن عنده 4 حصص فأكثر اليوم
   const sendNow = async () => {
@@ -114,14 +114,52 @@
   $('#btnSend').addEventListener('click', sendNow);
   document.querySelectorAll('[data-send-now]').forEach(b => b.addEventListener('click', sendNow));
 
-  // بعد أول إرسال لليوم: أي تعديل على التأمين يوصل تلقائي
-  let tmr;
+  // ---------------- ما فيه إرسال تلقائي (طلب أ. طلال 26 نوفمبر) ----------------
+  // أي تعديل يظل في السجل بس، وبعد ما يخلّص المدير المساعد تعديلاته يطلع له شريط واضح:
+  // «عندك تغييرات ما انرسلت — تبي ترسلها للمعلمين؟» وما يوصل المعلمين شي إلا بعد ما يضغط «إرسال».
+  let tmr, dayReady = '', barHidden = '';
+  function pendingChanges() {
+    if (dayReady !== A.date || busy) return null;
+    const iso = A.date, want = desired(), ids = new Set(want.map(w => w.id)), out = [];
+    const where = w => `${w.info.kind === 'duty' ? w.info.slotName : 'الحصة ' + w.info.slotName}${w.info.c ? ' (' + w.info.c + ')' : ''}`;
+    const who = w => w.to ? tName(w.to) : w.emg ? 'الإدارة: ' + w.emg : 'بدون مؤمّن';
+    for (const w of want) {
+      const cur = docs.find(d => d.id === w.id);
+      const live = cur && cur.status !== 'cancelled';
+      if (!live) { if (w.to || w.emg) out.push(`➕ ${where(w)} ← ${who(w)}${w.info.kind === 'swap' ? ' (تبديل)' : ''} — بدل ${w.info.absentName}`); continue; }
+      if (cur.to !== w.to || (!w.to && cur.emg !== w.emg) || (w.info.kind === 'swap' && String(cur.s2 || '') !== String(w.info.s2 || ''))) out.push(`🔄 ${where(w)}: ${cur.toName || cur.emg || 'بدون'} ← ${who(w)}`);
+    }
+    for (const d of docs) if (d.date === iso && !ids.has(d.id) && d.status !== 'cancelled' && (!d.dev || d.dev === DEV)) out.push(`✖ إلغاء ${d.kind === 'duty' ? d.slotName : 'الحصة ' + d.slotName}${d.c ? ' (' + d.c + ')' : ''} عن ${d.toName || d.emg || '—'} (${d.absentName || ''})`);
+    return out;
+  }
+  function refreshBar() {
+    let bar = document.getElementById('changeBar');
+    const list = pendingChanges();
+    if (!list || !list.length || barHidden === A.date + '|' + list.join('|')) { if (bar) bar.hidden = true; return; }
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'changeBar';
+      bar.setAttribute('style', 'position:fixed;left:12px;right:12px;bottom:12px;z-index:998;max-width:640px;margin:0 auto;background:#7a0a16;color:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,.35);line-height:1.6;direction:rtl');
+      document.body.appendChild(bar);
+      bar.addEventListener('click', async e => {
+        if (e.target.closest('[data-bar-send]')) { bar.hidden = true; await publish(true, false); }
+        else if (e.target.closest('[data-bar-later]')) { barHidden = bar.dataset.sig; bar.hidden = true; }
+      });
+    }
+    const sent = !!sentDays()[A.date];
+    bar.dataset.sig = A.date + '|' + list.join('|');
+    bar.innerHTML = `<div style="font-weight:700;font-size:1.05rem">📲 ${sent ? `عندك ${list.length === 1 ? "تغيير واحد" : list.length + " تغييرات"} ما انرسلت للمعلمين` : `تأمين يوم ${esc(A.weekdayName(A.date))} ما انرسل للمعلمين بعد`}</div>
+      <div style="font-size:.9rem;opacity:.95;margin:6px 0 10px;max-height:30vh;overflow:auto">${list.slice(0, 12).map(x => `<div>${esc(x)}</div>`).join('')}${list.length > 12 ? `<div>و${list.length - 12} غيرها…</div>` : ''}</div>
+      <div style="font-weight:600;margin-bottom:8px">تبي ترسل هالتغييرات للمعلمين الحين؟</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button data-bar-send style="flex:1;min-width:140px;padding:10px;border:0;border-radius:12px;background:#fff;color:#7a0a16;font-weight:800;font-size:1rem">نعم، أرسل للمعلمين</button><button data-bar-later style="padding:10px 14px;border:1px solid rgba(255,255,255,.6);border-radius:12px;background:transparent;color:#fff;font-weight:600">لاحقًا</button></div>`;
+    bar.hidden = false;
+  }
   document.addEventListener('apt:day', e => {
     watchDay();
     renderSend();
-    // فتح الصفحة أو تغيير التاريخ ما يرسل شي، الإرسال التلقائي بس بعد تعديل فعلي
-    if (e.detail !== 'load' && sentDays()[A.date]) { clearTimeout(tmr); tmr = setTimeout(() => publish(false), 600); }
+    // ننتظر لين يخلّص تعديلاته (ثانيتين بدون تعديل) وبعدين نسأله
+    clearTimeout(tmr); tmr = setTimeout(refreshBar, e.detail === 'load' ? 300 : 2000);
   });
+  window.addEventListener('beforeunload', e => { const l = pendingChanges(); if (l && l.length && sentDays()[A.date]) { e.preventDefault(); e.returnValue = ''; } });
 
   // ---------------- متابعة ردود اليوم ----------------
   let unDay = null, dayW = '';
@@ -129,7 +167,8 @@
     if (dayW === A.date) return;
     dayW = A.date;
     if (unDay) unDay();
-    unDay = S.watch('assign', ['date', '==', A.date], list => { docs = list; onDocs(); });
+    const iso = A.date;
+    unDay = S.watch('assign', ['date', '==', iso], list => { docs = list; dayReady = iso; onDocs(); refreshBar(); });
   }
   function lockPublished() {
     const st = A.state;
@@ -163,7 +202,7 @@
     document.querySelectorAll('[data-send-now]').forEach(b => { b.textContent = sent ? '✓ انرسل — إعادة الإرسال' : '📲 إرسال للمعلمين'; b.classList.toggle('done', sent); });
     if (A.refreshSum) A.refreshSum();
     $('#sendNote').textContent = !n ? 'ما فيه تأمين أو تبديل لهذا اليوم. اختر الغائبين من «تأمين اليوم».'
-      : sent ? `انرسل. أي تعديل على التأمين يوصل للمعلمين تلقائيًا، ولو اعتذر أحد يتحوّل للبديل اللي بعده.`
+      : sent ? `انرسل. أي تعديل بعدها ما يوصل المعلمين إلا لما تضغط «إرسال» في الشريط اللي يطلع لك. ولو اعتذر معلم يتحوّل للبديل اللي بعده تلقائيًا.`
         : `${n} مهمة جاهزة للإرسال.`;
   }
 
@@ -429,8 +468,8 @@
     if (r.err) { await A.ask(r.err + '\n\nتقدر تعتذر عن الطلب أو تسجّل الغياب بنفسك من «التأمين».', 'حسنًا'); return; }
     const result = [{ ok: true, txt: `تم اعتماد غيابك، وتوزّعت حصصك (${r.n}) على الزملاء${r.covered < r.n ? ' — والباقي ترتّبه الإدارة' : ''}` }];
     await S.set('msgs/' + id, { status: 'approved', result, decidedAt: now(), readT: false });
-    if (sentDays()[q.date]) await publish(false);
     document.querySelector('.tab[data-tab="today"]').click();
+    refreshBar();
     A.toast(`اعتُمد غياب ${q.name} — راجع توزيع يوم ${A.weekdayName(q.date)}، وأرسله للمعلمين في يومه`);
   }
   function renderReqs() {
@@ -444,7 +483,7 @@
     if (r.err) { A.toast(r.err); await A.ask(r.err + '\n\nتقدر ترتبه بنفسك من «التبديل والاستئذان» أو تعتذر عن الطلب.', 'حسنًا'); return; }
     const result = r.result.concat(r.skipped.length ? [{ ok: false, txt: `الحصص ${r.skipped.join('، ')}: ما عندك فيها حصة تدريس` }] : []);
     await S.set('msgs/' + id, { status: 'approved', result, decidedAt: now(), readT: false });
-    if (!sentDays()[q.date]) await publish(false);
+    refreshBar();
     const sw = r.result.filter(x => x.ok && !x.cover).length, cv = r.result.filter(x => x.cover).length;
     if (r.uncovered && r.uncovered.length) await A.ask(`⚠️ انتبه: ${r.uncovered.join('، ')} لـ ${q.name} ما تيسّر لها تبديل ولا مؤمّن متاح.\n\nرتّبها بنفسك من «التأمين» (اختر مؤمّن أو «الإدارة»)، وإلا يظل الصف بدون أحد.`, 'حسنًا');
     else A.toast(cv ? `تبدّل ${sw} وتأمّن ${cv} — وصل الرد لـ ${q.name}` : `تم التبديل ووصل الرد لـ ${q.name}`);
