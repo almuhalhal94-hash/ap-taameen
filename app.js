@@ -164,8 +164,9 @@
   // ونسخة منها في المتصفح احتياط.
   let cloud = null, cloudWarned = false;
   const writing = new Map(), pendingW = new Map();
+  const earlyW = new Set();  // تعديلات صارت قبل ما يكمل تحميل السحابة
   function cloudWrite(path, body) {
-    if (!cloud) return;
+    if (!cloud) { if (!claudeHost) earlyW.add(path); return; }
     if (writing.has(path)) { pendingW.set(path, body); return; }
     const run = async b => {
       writing.set(path, true);
@@ -184,8 +185,113 @@
     const el = $('#storageNote'); if (!el) return;
     el.textContent = cloud ? '☁︎ السجل محفوظ في السحابة، ويطلع نفسه من أي جهاز.' : 'السجل محفوظ في هذا المتصفح فقط — خذ نسخة احتياطية بين فترة وفترة.';
   }
+  // ---------------- مزامنة سجل الإدارة بين كل الأجهزة (Firebase، 26 نوفمبر) ----------------
+  // كل يوم: people/_adm_d_{iso} = {json, rev, by, at} — الفهرس: people/_adm_idx = {days:{iso:rev}} — الإعدادات: people/_adm_cfg
+  // آخر حفظ يكسب، والتعديل يوصل باقي الأجهزة المفتوحة خلال ثواني. نسخة في المتصفح احتياط.
+  const DEVID = (() => { try { let d = localStorage.getItem('apt-dev'); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 10); localStorage.setItem('apt-dev', d); } return d; } catch (e) { return 'd-anon'; } })();
+  const CNS = (new URLSearchParams(location.search).get('cloudns') || '').replace(/[^a-zA-Z0-9]/g, '');  // للاختبار فقط
+  const FB_DAY = iso => `people/_adm${CNS}_d_${iso}`, FB_IDX = `people/_adm${CNS}_idx`, FB_CFG = `people/_adm${CNS}_cfg`, MIG = 'apt-cloud-mig' + CNS;
+  const knownRev = {};
+  let cfgRev = 0, fbS = null;
+  function fbCloud(S) {
+    const writeDay = async iso => {
+      const json = db.history[iso] ? JSON.stringify(db.history[iso]) : 'null';
+      let rev = 0;
+      await S.tx(FB_DAY(iso), cur => { rev = ((cur && cur.rev) || 0) + 1; return { json, rev, by: DEVID, at: Date.now() }; });
+      knownRev[iso] = rev;
+      await S.tx(FB_IDX, cur => { const days = { ...((cur && cur.days) || {}) }; if ((days[iso] || 0) >= rev) return null; days[iso] = rev; return { days }; });
+    };
+    const writeCfg = async () => {
+      const json = JSON.stringify({ settings: db.settings, avail: db.avail });
+      await S.tx(FB_CFG, cur => { cfgRev = ((cur && cur.rev) || 0) + 1; return { json, rev: cfgRev, by: DEVID, at: Date.now() }; });
+    };
+    const run = path => path === 'config/main' ? writeCfg() : writeDay(path.slice(5));
+    return { doc: path => ({ set: () => run(path), delete: () => run(path) }) };
+  }
+  // تعارض أول مرة بين نسخة الجهاز ونسخة السحابة لنفس اليوم: نختار اللي تطابق التكليفات المرسلة للمعلمين
+  const sentOf = (S, iso) => new Promise(res => { let un = null, done = false; const t = setTimeout(() => { done = true; res([]); }, 8000); un = S.watch('assign', ['date', '==', iso], list => { if (done) return; done = true; clearTimeout(t); setTimeout(() => un && un(), 0); res(list); }); });
+  function matchScore(day, iso, sent) {
+    const live = new Set(sent.filter(d => d.status !== 'cancelled').map(d => d.id));
+    const keys = [];
+    (day.rows || []).forEach(r => keys.push(`${iso}_${r.slot.startsWith('B') ? 'duty' : 'cover'}_${r.absent}_${r.slot}`));
+    (day.swaps || []).forEach(sw => sw.items.forEach(it => { if (it.b) keys.push(`${iso}_swap_${sw.a}_${it.s}`); }));
+    const hit = keys.filter(k => live.has(k)).length;
+    return hit * 2 - (keys.length - hit) - (live.size - hit);
+  }
+  async function startFirebase() {
+    await new Promise(r => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', r) : r());
+    if (!window.Sync) { setStorageNote(); return; }
+    let S;
+    try { S = await window.Sync.ready; } catch (e) { setStorageNote(); return; }
+    if (S.mode !== 'firebase' && !CNS) { setStorageNote(); return; }
+    fbS = S;
+    try {
+      const migrated = localStorage.getItem(MIG) === '1';
+      const [idx, cfgDoc] = await Promise.all([S.get(FB_IDX), S.get(FB_CFG)]);
+      const cloudDays = {};
+      await Promise.all(Object.keys((idx && idx.days) || {}).map(async iso => {
+        const d = await S.get(FB_DAY(iso));
+        if (d) { knownRev[iso] = d.rev || 0; cloudDays[iso] = d.json === 'null' ? null : JSON.parse(d.json); }
+      }));
+      cloud = fbCloud(S);
+      if (!migrated) { try { localStorage.setItem('apt-local-backup' + CNS, JSON.stringify({ at: new Date().toISOString(), history: db.history, settings: db.settings, avail: db.avail })); } catch (e) { } }
+      // الإعدادات: السحابة تكسب، وأيام «انرسل» تنضم من الجهاز أول مرة
+      if (cfgDoc && cfgDoc.json) {
+        const v = JSON.parse(cfgDoc.json); cfgRev = cfgDoc.rev || 0;
+        const cloudSent = (v.settings && v.settings.sentDays) || {};
+        const sent = migrated ? cloudSent : { ...(db.settings.sentDays || {}), ...cloudSent };
+        db.settings = { ...defaults().settings, ...(v.settings || {}), sentDays: sent };
+        db.avail = v.avail || {};
+        if (JSON.stringify(sent) !== JSON.stringify(cloudSent)) cloudWrite('config/main', 1);
+      } else cloudWrite('config/main', 1);
+      // الأيام
+      const isos = new Set([...Object.keys(db.history), ...Object.keys(cloudDays)]);
+      for (const iso of isos) {
+        const loc = db.history[iso], inCloud = iso in cloudDays, cv = cloudDays[iso];
+        if (!inCloud || earlyW.has(`days/${iso}`)) { if (loc || inCloud) cloudWrite(`days/${iso}`, 1); continue; }
+        if (JSON.stringify(cv || null) === JSON.stringify(loc || null)) continue;
+        if (!migrated && loc && cv) {
+          const sent = await sentOf(S, iso);
+          if (matchScore(loc, iso, sent) > matchScore(cv, iso, sent)) { cloudWrite(`days/${iso}`, 1); continue; }
+        } else if (!migrated && loc && !cv) { cloudWrite(`days/${iso}`, 1); continue; }
+        if (cv) db.history[iso] = cv; else delete db.history[iso];
+      }
+      if (earlyW.has('config/main')) cloudWrite('config/main', 1);
+      earlyW.clear();
+      localStorage.setItem(MIG, '1');
+      persist();
+      renderSettings(); loadDate(date);
+      if (document.querySelector('.tab.active')?.dataset.tab === 'stats') renderStats();
+      // تحديث مباشر من باقي الأجهزة
+      S.watchDoc(FB_IDX, async v => {
+        const days = (v && v.days) || {};
+        let touched = false;
+        for (const [iso, rev] of Object.entries(days)) {
+          if ((knownRev[iso] || 0) >= rev || writing.has(`days/${iso}`)) continue;
+          const d = await S.get(FB_DAY(iso));
+          if (!d || (knownRev[iso] || 0) >= (d.rev || 0)) continue;
+          knownRev[iso] = d.rev || 0;
+          const val = d.json === 'null' ? null : JSON.parse(d.json);
+          if (JSON.stringify(val) === JSON.stringify(db.history[iso] || null)) continue;
+          if (val) db.history[iso] = val; else delete db.history[iso];
+          touched = true;
+          if (iso === date) { loadDate(date); toast('↻ وصل تحديث من جهاز ثاني'); }
+        }
+        if (touched) { persist(); if (document.querySelector('.tab.active')?.dataset.tab === 'stats') renderStats(); }
+      });
+      S.watchDoc(FB_CFG, v => {
+        if (!v || !v.json || (v.rev || 0) <= cfgRev || writing.has('config/main')) return;
+        cfgRev = v.rev || 0;
+        const x = JSON.parse(v.json);
+        db.settings = { ...defaults().settings, ...(x.settings || {}) };
+        db.avail = x.avail || {};
+        persist(); renderSettings(); loadDate(date);
+      });
+    } catch (e) { console.warn('cloud', e); cloud = null; toast('تعذّر تحميل السجل من السحابة — شغّال على نسخة هذا الجهاز'); }
+    setStorageNote();
+  }
   async function startCloud() {
-    if (!claudeHost) { setStorageNote(); return; }
+    if (!claudeHost) { startFirebase(); return; }
     let c = null;
     try { c = await window.claude.use('db'); } catch (e) { c = null; }
     if (!c) { setStorageNote(); return; }

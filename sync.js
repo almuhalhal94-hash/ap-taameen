@@ -29,7 +29,12 @@
         },
         watch(c, wh, cb) {
           return F.onSnapshot(q(c, wh), s => cb(s.docs.map(x => ({ id: x.id, ...x.data() }))), e => console.warn('sync', e));
-        }
+        },
+        // مراقبة مستند واحد (تحديث مباشر)
+        watchDoc(p, cb) {
+          return F.onSnapshot(ref(p), s => { if (!s.metadata.hasPendingWrites) cb(s.exists() ? s.data() : null); }, e => console.warn('sync', e));
+        },
+        del(p) { return F.deleteDoc(ref(p)); }
       };
     });
   }
@@ -59,6 +64,13 @@
       async put(p, d) { const [c, id] = split(p); all[c] = all[c] || {}; all[c][id] = clone(d); save(); },
       async add(c, d) { const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7); all[c] = all[c] || {}; all[c][id] = clone(d); save(); return id; },
       async tx(p, fn) { all = load(); const [c, id] = split(p); const v = fn(clone((all[c] || {})[id])); if (v) { all[c] = all[c] || {}; all[c][id] = clone(v); save(); } return v; },
+      async del(p) { const [c, id] = split(p); if (all[c]) delete all[c][id]; save(); },
+      watchDoc(p, cb) {
+        let last = '';
+        const run = () => { const [c, id] = split(p); const v = clone((all[c] || {})[id]); const sig = JSON.stringify(v); if (sig !== last) { last = sig; cb(v); } };
+        subs.add(run); run();
+        return () => subs.delete(run);
+      },
       watch(c, wh, cb) {
         let last = '';
         const run = () => {
