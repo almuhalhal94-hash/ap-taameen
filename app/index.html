@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تأمين وتبديل — ابن رشد</title>
+<meta name="theme-color" content="#2b0408">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="تأمين وتبديل">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="shell" id="shell">
+  <header class="top" id="top" hidden>
+    <div class="brand"><span class="logo"><img src="icon.svg" alt=""></span><div><small>مدرسة ابن رشد الإعدادية للبنين</small><b id="roleTitle">التأمين والتبديل</b></div></div>
+    <button class="me" id="meBtn" aria-label="الحساب"><small id="today"></small><b id="myName">…</b></button>
+  </header>
+
+  <main id="views">
+    <!-- الدخول بالرمز -->
+    <section class="view" id="v-login">
+      <div class="login">
+        <div class="login-logo"><img src="icon.svg" alt=""></div>
+        <h1>التأمين والتبديل</h1>
+        <p>مدرسة ابن رشد الإعدادية للبنين</p>
+        <form id="loginForm" autocomplete="off">
+          <label for="codeIn">أدخل رمزك الخاص</label>
+          <div class="code-boxes" id="codeBoxes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <input id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="رمز الدخول">
+          <button class="btn-main" id="loginBtn" disabled>دخول</button>
+          <p class="err" id="loginErr"></p>
+        </form>
+        <p class="login-note">الرمز يوصلك من المدير المساعد. لا تشاركه مع أحد.</p>
+      </div>
+    </section>
+
+    <section class="view" id="v-tasks">
+      <div class="hello" id="hello"></div>
+      <div class="push-box" id="pushBox" hidden></div>
+      <div class="pend-bar" id="pendBar" hidden></div>
+      <div class="multi" id="multi" hidden></div>
+      <div class="stack-wrap">
+        <div class="stack" id="stack"></div>
+        <div class="empty" id="emptyTasks" hidden>
+          <div class="empty-ic">✓</div>
+          <b>ما عندك تكليفات جديدة</b>
+          <p>أي تأمين أو مراقبة أو تبديل يخصك يطلع هنا أول ما ترسله الإدارة.</p>
+        </div>
+        <div class="acts" id="acts" hidden>
+          <button class="act no" id="btnNo"><span>!</span>عندي عذر رسمي</button>
+          <button class="act yes" id="btnYes"><span>✓</span>استلمت التكليف</button>
+        </div>
+        <p class="swipe-hint" id="swipeHint" hidden>اسحب البطاقة <b class="y">يمين للاستلام</b> · <b class="n">يسار للاعتذار بعذر رسمي</b></p>
+      </div>
+      <button class="req-btn abs" id="btnAbs" type="button"><i>✉</i><span><b>طلب تأمين حصص</b><small>لغيابك بعذر رسمي — اليوم أو أي يوم قادم</small></span></button>
+      <button class="req-btn" id="btnReq" type="button"><i>⇄</i><span><b>طلب تبديل حصة</b><small>اختر اليوم والحصص، والإدارة ترتّب لك البديل</small></span></button>
+      <div id="reqList" class="list"></div>
+      <h3 class="sec" id="doneHead">تكليفاتي</h3>
+      <div id="doneList" class="list"></div>
+    </section>
+
+    <section class="view" id="v-sup">
+      <div class="sup-head"><p class="lead" id="supLead"></p><div class="sum" id="supSum"></div></div>
+      <div id="supList" class="list"></div>
+    </section>
+
+    <section class="view" id="v-exp">
+      <div id="expList" class="list"></div>
+    </section>
+
+    <section class="view" id="v-chat">
+      <div class="chat">
+        <div class="chat-h">المحادثة مع الإدارة <small>تنحفظ موثّقة عند المدير المساعد</small></div>
+        <div class="chat-body" id="chatBody"></div>
+        <form class="chat-in" id="chatForm"><input id="chatText" placeholder="اكتب رسالة…" autocomplete="off"><button aria-label="إرسال">➤</button></form>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bar" id="bar" hidden>
+    <button data-v="tasks" id="tabTasks"><i>▤</i>تكليفاتي<span class="nb" id="nbTasks" hidden></span></button>
+    <button data-v="sup" id="tabSup" hidden><i>◉</i>المتابعة<span class="nb" id="nbSup" hidden></span></button>
+    <button data-v="exp" id="tabExp"><i>✎</i>الاستيضاح<span class="nb" id="nbExp" hidden></span></button>
+    <button data-v="chat"><i>✉</i>المحادثة<span class="nb" id="nbChat" hidden></span></button>
+  </nav>
+  <div class="demo" id="demoNote" hidden>وضع تجربة — على هذا الجهاز فقط</div>
+  <button class="notif" id="btnNotif" hidden>🔔 فعّل التنبيهات عشان يوصلك التكليف</button>
+</div>
+
+<!-- نافذة التأكيد / الاعتذار -->
+<div class="sheet-bg" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+    <div class="grab"></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+<div class="snack" id="snack" role="status" aria-live="polite"><span id="snackTxt"></span><button id="snackUndo">تراجع</button><i id="snackBar"></i></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="../firebase-config.js"></script>
+<script src="../sync.js"></script>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
