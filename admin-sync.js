@@ -9,7 +9,12 @@
   const DEMO = S.mode === 'demo';
   let pstat = [], csRange = 'week', docs = [], exps = [], msgs = [], allDocs = [], alerts = [], alertsReady = false, reqs = [], reqsReady = false;
   const ORDER = ['1', '2', 'B1', '3', 'B2', '4', '5', '6', '7'];
-  const now = () => Date.now();
+  // ساعة الجهاز: نصحّحها من وقت الخادم (جهاز الإدارة كان مقدّم 12 ساعة وخرّب الأوقات)
+  let SKEW = 0;
+  const now = () => Date.now() + SKEW;
+  const todayISO = () => A.isoOf(new Date(now()));
+  // رقم ثابت لهذا الجهاز: عشان جهاز ما يلغي تكليفات أرسلها جهاز ثاني بدون ما يدري
+  const DEV = (() => { try { let d = localStorage.getItem('apt-dev'); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 10); localStorage.setItem('apt-dev', d); } return d; } catch (e) { return 'd-anon'; } })();
   const KIND = { cover: 'تأمين حصة', duty: 'مراقبة فسحة', swap: 'تبديل' };
   const STATUS = { pending: 'بانتظار الرد', accepted: 'قبل', emergency: 'طوارئ', none: 'بدون مؤمّن', cancelled: 'ملغي' };
   const code = c => c ? c.split(' / ').map(x => `<span class="code">${[...x].map(ch => `<i>${esc(ch)}</i>`).join('')}</span>`).join(' / ') : '';
@@ -57,14 +62,17 @@
     return Object.fromEntries(ids.map(id => [id, tName(id)]));
   };
 
+  const lastAct = (c, tid) => { const l = [...(c.log || [])].reverse().find(x => x.tid === tid && ['accepted', 'returned', 'undo', 'rejected', 'withdrew'].includes(x.act)); return l && (l.act === 'accepted' || l.act === 'returned') ? 'ok' : ''; };
   function merged(cur, w) {
     const base = { ...w.info, backups: w.backups, sups: w.sups };
     const statusFor = to => to ? 'pending' : (w.emg ? 'emergency' : 'none');
-    if (!cur) return { ...base, to: w.to, toName: w.to ? tName(w.to) : '', emg: w.emg, status: statusFor(w.to), auto: false, first: w.to, refused: [], released: [], log: [], names: namesOf(w), createdAt: now(), updatedAt: now() };
-    const n = { ...cur, ...base, names: { ...(cur.names || {}), ...namesOf(w) } };
+    if (!cur) return { ...base, to: w.to, toName: w.to ? tName(w.to) : '', emg: w.emg, status: statusFor(w.to), auto: false, first: w.to, refused: [], released: [], log: [], names: namesOf(w), dev: DEV, createdAt: now(), updatedAt: now() };
+    const n = { ...cur, ...base, names: { ...(cur.names || {}), ...namesOf(w) }, dev: DEV };
     if (cur.status === 'cancelled' || cur.to !== w.to || (!w.to && cur.emg !== w.emg)) {
       if (cur.to && cur.to !== w.to && cur.status !== 'cancelled') n.log = [...(cur.log || []), { tid: cur.to, name: cur.toName, act: 'reassigned', at: now() }];
       Object.assign(n, { to: w.to, toName: w.to ? tName(w.to) : '', emg: w.emg, status: statusFor(w.to), auto: false });
+      // التكليف انلغى ورجع لنفس المعلم وهو كان مستلمه: يظل «مستلم» وما ينطلب منه يستلم مرة ثانية
+      if (cur.status === 'cancelled' && w.to && cur.to === w.to && lastAct(cur, w.to) === 'ok') n.status = 'accepted';
     }
     // «إعادة الإرسال» يذكّر اللي ما استلم بعد (الحارس يرسل له تذكير)
     if (NUDGE && cur.status === 'pending' && n.status === 'pending' && n.to) n.nudgeAt = now();
@@ -85,7 +93,12 @@
       NUDGE = !!manual && !!sentDays()[iso];
       for (const w of want) await S.tx('assign/' + w.id, cur => merged(cur, w));
       NUDGE = false;
-      for (const d of docs) if (d.date === iso && !ids.has(d.id) && d.status !== 'cancelled') await S.set('assign/' + d.id, { status: 'cancelled', updatedAt: now() });
+      const gone = docs.filter(d => d.date === iso && !ids.has(d.id) && d.status !== 'cancelled');
+      const foreign = gone.filter(d => d.dev && d.dev !== DEV);
+      let okForeign = false;
+      if (foreign.length && manual) okForeign = await A.ask(`تنبيه: فيه ${foreign.length} تكليف لهذا اليوم انرسل من جهاز ثاني، ومو موجود في سجل هذا الجهاز:\n${foreign.slice(0, 8).map(d => '• ' + (d.slotName || '') + ' ' + (d.c || '') + ' — ' + (d.toName || d.absentName || '')).join('\n')}\n\nتبي تلغيها؟ (لو مو متأكد اختر «لا» وراجع الجهاز الثاني)`, 'نعم، ألغها');
+      if (foreign.length && !manual) A.toast(`فيه ${foreign.length} تكليف من جهاز ثاني ما انلغى — راجعها`);
+      for (const d of gone) if (!d.dev || d.dev === DEV || okForeign) await S.set('assign/' + d.id, { status: 'cancelled', updatedAt: now(), dev: DEV });
       if (!sentDays()[iso]) { sentDays()[iso] = true; A.saveSettings(); }
       if (manual) A.toast(`✓ تم الإرسال لـ ${new Set(want.map(w => w.to).filter(Boolean)).size} معلم — يطلع لهم في التطبيق الحين`);
     } catch (e) { console.warn(e); A.toast('تعذّر الإرسال — تأكد من الاتصال'); }
@@ -402,7 +415,7 @@
     const btns = q.status !== 'pending' ? '' : ab
       ? `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-ab-ok="${q.id}">✓ اعتماد وتوزيع حصصه</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>`
       : `<div class="btn-row" style="margin-top:8px"><button class="btn sm primary" data-rq-auto="${q.id}">⚡ تبديل تلقائي</button><button class="btn sm" data-rq-manual="${q.id}">✋ أرتبه بنفسي</button><button class="btn sm" data-rq-no="${q.id}">اعتذار عن الطلب</button></div>`;
-    const urgent = q.date === A.isoOf(new Date()) ? ' <span class="urg">🔴 اليوم — طارئ</span>' : '';
+    const urgent = q.date === todayISO() ? ' <span class="urg">🔴 اليوم — طارئ</span>' : '';
     const head = (ab ? `طلب تأمين حصص (غياب بعذر رسمي) من ${esc(q.name)}` : `طلب تبديل من ${esc(q.name)}`) + urgent;
     const why = ab ? `العذر: <b>${esc(q.kindTxt || '')}</b>${q.reason ? ` — «${esc(q.reason)}»` : ''} · تعهّد بتقديم الإثبات` : `السبب: «${esc(q.reason)}»${q.prefer ? ` · الزميل المقترح: <b>${esc(q.prefer)}</b>` : ''}`;
     return `<div class="resp v-${st[0]} ${ab ? 'is-abs' : ''}"><div class="vstate">${st[1]} — ${head}</div>
@@ -421,7 +434,7 @@
     A.toast(`اعتُمد غياب ${q.name} — راجع توزيع يوم ${A.weekdayName(q.date)}، وأرسله للمعلمين في يومه`);
   }
   function renderReqs() {
-    const list = reqs.filter(q => q.date >= A.isoOf(new Date()) || q.status === 'pending');
+    const list = reqs.filter(q => q.date >= todayISO() || q.status === 'pending');
     $('#reqAdmin').innerHTML = list.length ? list.map(q => reqCardHTML(q)).join('') : '<p class="muted">ما فيه طلبات تبديل أو تأمين.</p>';
   }
   async function reqAuto(id) {
@@ -432,8 +445,9 @@
     const result = r.result.concat(r.skipped.length ? [{ ok: false, txt: `الحصص ${r.skipped.join('، ')}: ما عندك فيها حصة تدريس` }] : []);
     await S.set('msgs/' + id, { status: 'approved', result, decidedAt: now(), readT: false });
     if (!sentDays()[q.date]) await publish(false);
-    const ok = r.result.filter(x => x.ok).length;
-    A.toast(ok === r.result.length ? `تم التبديل ووصل الرد لـ ${q.name}` : `تبدّل ${ok} من ${r.result.length} — الباقي دخل جدول التأمين`);
+    const sw = r.result.filter(x => x.ok && !x.cover).length, cv = r.result.filter(x => x.cover).length;
+    if (r.uncovered && r.uncovered.length) await A.ask(`⚠️ انتبه: ${r.uncovered.join('، ')} لـ ${q.name} ما تيسّر لها تبديل ولا مؤمّن متاح.\n\nرتّبها بنفسك من «التأمين» (اختر مؤمّن أو «الإدارة»)، وإلا يظل الصف بدون أحد.`, 'حسنًا');
+    else A.toast(cv ? `تبدّل ${sw} وتأمّن ${cv} — وصل الرد لـ ${q.name}` : `تم التبديل ووصل الرد لـ ${q.name}`);
   }
   async function reqManual(id) {
     const q = reqs.find(x => x.id === id); if (!q) return;
@@ -503,7 +517,7 @@
         return `<article><div class="h"><b>${e(t.name)}</b><span class="c">${C[t.id]}</span></div><pre>${e(m.replace(/\*/g, ''))}</pre><div class="b"><a class="wa" href="https://wa.me/?text=${encodeURIComponent(m)}" target="_blank">إرسال بالواتساب</a><button type="button" data-m="${e(m)}">نسخ الرسالة</button></div></article>`;
       }).join('') + '</section>';
     }).join('');
-    const today = A.fmtG(A.isoOf(new Date()));
+    const today = A.fmtG(todayISO());
     const all = A.T.filter(t => C[t.id]).map(t => msgFor(t)).join('\n\n━━━━━━━━━━━━\n\n');
     return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>رسائل رموز دخول المعلمين</title><style>
 body{margin:0;background:#f7f1e8;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;color:#2b1a12}
@@ -606,17 +620,33 @@ footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:
   async function guardStatus() {
     const el = $('#pushStat'); if (!el || S.mode === 'demo') return;
     const g = await S.get('people/_guard').catch(() => null);
-    const ok = g && Date.now() - g.at < 4 * 60e3;
+    const ok = g && Math.abs(now() - g.at) < 4 * 60e3;
     el.className = 'push-stat ' + (ok ? 'ok' : 'bad');
     el.innerHTML = ok ? `🔔 الإشعارات شغالة ✓ <small>${g.teachers} معلم مفعّل</small>` : `⚠️ الإشعارات متوقفة الحين <small>التطبيق يشتغل عادي — بلّغ المعلمين بالقروب، وكلّم أ. طلال</small>`;
   }
+  async function clockCheck() {
+    try {
+      const t0 = Date.now(), r = await fetch(location.pathname + '?t=' + t0, { method: 'HEAD', cache: 'no-store' }), srv = Date.parse(r.headers.get('date') || '');
+      if (!srv) return;
+      SKEW = srv - (t0 + Date.now()) / 2;
+      if (Math.abs(SKEW) < 3 * 60e3) { SKEW = 0; return; }   // فرق بسيط ما يهم
+      if (document.getElementById('clockWarn')) return;
+      const h = Math.round(Math.abs(SKEW) / 36e5 * 10) / 10, el = document.createElement('div');
+      el.id = 'clockWarn';
+      el.setAttribute('style', 'position:sticky;top:0;z-index:999;background:#b4232c;color:#fff;padding:10px 14px;text-align:center;font-weight:700;line-height:1.6');
+      el.innerHTML = `⚠️ ساعة هذا الجهاز ${SKEW < 0 ? 'مقدّمة' : 'متأخرة'} ${h} ساعة. صحّحها من إعدادات الجهاز: «التاريخ والوقت تلقائي» والمنطقة الزمنية «البحرين».<br><small style="font-weight:400">التطبيق يصحّح الوقت مؤقتًا، بس لازم تنضبط ساعة الجهاز.</small>`;
+      document.body.prepend(el);
+      guardStatus();
+    } catch (e) { }
+  }
+  clockCheck();
   guardStatus(); setInterval(guardStatus, 60e3);
 
   // ---------------- إحصائية التأمين من السحابة (لكل الأجهزة) ----------------
   function renderCloudStats() {
     const box = $('#csTable'); if (!box) return;
-    const now = new Date(), iso = A.isoOf(now);
-    const sun = new Date(now); sun.setDate(now.getDate() - now.getDay());
+    const nd = new Date(now()), iso = A.isoOf(nd);
+    const sun = new Date(nd); sun.setDate(nd.getDate() - nd.getDay());
     const from = csRange === 'week' ? A.isoOf(sun) : csRange === 'month' ? iso.slice(0, 8) + '01' : '0000';
     const docs = allDocs.filter(d => d.date >= from && d.date <= iso && d.status !== 'cancelled');
     const per = {}; let refusals = 0;
@@ -656,8 +686,8 @@ footer{text-align:center;font-size:.8rem;color:#7a6650;padding:18px;line-height:
   const ALERT = { rejected: ['⚠', 'اعتذار من'], withdrew: ['⚠', 'اعتذار بعد الاستلام من'], askback: ['⭐', 'طلب رجوع للتكليف من'], returned: ['✓', 'تراجع عن اعتذاره وسيحضر:'] };
   const seenA = (() => { try { return new Set(JSON.parse(localStorage.getItem('apt-admin-seen') || '[]')); } catch (e) { return new Set(); } })();
   const saveSeen = () => { try { localStorage.setItem('apt-admin-seen', JSON.stringify([...seenA].slice(-500))); } catch (e) { } };
-  const today = A.isoOf(new Date());
   S.watch('assign', null, list => {
+    const today = todayISO();
     allDocs = list; renderCloudStats();
     const fresh = [];
     alerts = [];

@@ -30,6 +30,7 @@
   };
   const slotPlain = (s, code) => { const iv = ivOf(s, code); return { name: SLOT_NAME[s] || s, time: `${hm(iv[0])}–${hm(iv[1])}` }; };
   const NON_TEACHING = new Set(['مراقبة', 'اجتماع', 'اجتماع القسم', 'اجتماع التحسين', 'تطوير مهني', 'مشرف متابع']);
+  const isMeeting = c => !!c && !c.swap && /^اجتماع/.test(c.t || '');
   const STORE = 'ap-taameen-v1';
   const slotIdx = s => SLOT_ORDER.indexOf(s);
 
@@ -267,8 +268,11 @@
     const isOutIv = (tid, iv) => (out.get(tid) || []).some(w => overlap(w, iv));
     // مشغول إذا عنده أي شي يتداخل وقته مع هالفترة
     const busyIv = (tid, iv) => SLOT_ORDER.some(s => { const c = cell(tid, s); return c && overlap(ivOf(s, c.c), iv); });
+    // للتبديل: الاجتماع العادي ما يمنع (طلب المدير المساعد 26 نوفمبر) — الحصة والمراقبة والتطوير المهني تمنع
+    const busyIvSwap = (tid, iv) => SLOT_ORDER.some(s => { const c = cell(tid, s); return c && !isMeeting(c) && overlap(ivOf(s, c.c), iv); });
+    const meetIv = (tid, iv) => SLOT_ORDER.some(s => { const c = cell(tid, s); return c && isMeeting(c) && overlap(ivOf(s, c.c), iv); });
     const absentSet = new Set(Object.keys(st.absent));
-    return { d, cell, isOutIv, busyIv, absentSet };
+    return { d, cell, isOutIv, busyIv, busyIvSwap, meetIv, absentSet };
   }
   // وقت خروج المستأذن [بداية، نهاية]
   function winOf(sw) {
@@ -318,7 +322,8 @@
     for (const b of T) {
       if (b.id === a || !presentOn(b, ctx.d) || ctx.absentSet.has(b.id)) continue;
       const ivS = ivOf(it.s, it.c);
-      if (ctx.busyIv(b.id, ivS) || ctx.isOutIv(b.id, ivS)) continue; // البديل لازم يكون فاضي وقت حصة صاحب الطلب
+      if (ctx.busyIvSwap(b.id, ivS) || ctx.isOutIv(b.id, ivS)) continue; // البديل لازم يكون فاضي وقت حصة صاحب الطلب (الاجتماع العادي ما يمنع)
+      const meetB = ctx.meetIv(b.id, ivS);
       for (const s2 of TEACH_SLOTS) {
         if (s2 === it.s) continue;
         const bc = ctx.cell(b.id, s2);
@@ -329,8 +334,10 @@
         // الحصص اللي صاحب الطلب داخلها أصلًا بتبديل ثاني في نفس اليوم — ما ينعطى فيها شي ثاني
         if (state.swaps.some(x => x !== sw && x.a === a && x.items.some(i => i.b && i.s2 === s2))) continue;
         if (!sw.reorder && overlap(iv2, winOf(sw))) continue;          // صاحب الطلب برا المدرسة وقتها
-        if ((ctx.busyIv(a, iv2) && !(vac && vac.has(s2))) || ctx.isOutIv(b.id, iv2)) continue; // صاحب الطلب فاضي وقتها
-        opts.push({ b: b.id, s2, t2: bc.t, covering: covering.has(b.id), key: [covering.has(b.id) ? 1 : 0, hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
+        if ((ctx.busyIvSwap(a, iv2) && !(vac && vac.has(s2))) || ctx.isOutIv(b.id, iv2)) continue; // صاحب الطلب فاضي وقتها (الاجتماع ما يمنع)
+        // اللي ما عنده اجتماع يتقدّم على اللي عنده اجتماع
+        const meet = meetB || ctx.meetIv(a, iv2);
+        opts.push({ b: b.id, s2, t2: bc.t, meet, covering: covering.has(b.id), key: [covering.has(b.id) ? 1 : 0, meet ? 1 : 0, hist.swB[b.id] || 0, Math.abs(slotIdx(s2) - slotIdx(it.s)), b.teaching] });
       }
     }
     return opts.sort((x, y) => sortKey(x.key, y.key) || nm(x.b).localeCompare(nm(y.b), 'ar'));
@@ -1168,12 +1175,20 @@
         state.swaps = state.swaps.filter(x => x !== sw); afterChange();
         return { err: `ما تيسّر قلب الحصص لـ ${nm(a)}: ما فيه زميل يدرّس نفس الصف ويقدر يتبادل في الوقت المطلوب لكل الحصص. تقدر ترتبه بنفسك أو تعتذر عن الطلب.` };
       }
+      // تعذّر التبديل: الحصة تتأمّن (للضرورة) حتى لو وضع الاختيار يدوي — ما تظل الحصة بدون أحد
+      sw.items.forEach(it => { if (!it.b) Object.assign(it, { b: '', s2: '', t2: '', none: true }); });
       afterChange();
-      const res = sw.items.map(it => it.b
-        ? { ok: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}) يدخلها ${nm(it.b)}، وتدخل أنت حصته ${SLOT_NAME[it.s2]}${it.wantMiss ? ` (ما تيسّر تبديل في ${SLOT_NAME[it.wantMiss]} اللي طلبتها)` : ''}` }
-        : { ok: false, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}): ما فيه زميل متاح للتبديل، وتُغطّى بالتأمين` });
+      const uncovered = [];
+      const res = sw.items.map(it => {
+        if (it.b) return { ok: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}) يدخلها ${nm(it.b)}، وتدخل أنت حصته ${SLOT_NAME[it.s2]}${it.wantMiss ? ` (ما تيسّر تبديل في ${SLOT_NAME[it.wantMiss]} اللي طلبتها)` : ''}` };
+        const r = state.rows.find(x => x.absent === a && x.slot === it.s);
+        if (r && r.sub && !isE(r.sub)) return { ok: true, cover: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}): ما تيسّر تبديل، فيؤمّنها ${nm(r.sub)}` };
+        if (r && r.sub) return { ok: true, cover: true, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}): ما تيسّر تبديل، وتؤمّنها الإدارة (${r.sub.slice(2)})` };
+        uncovered.push(`${SLOT_NAME[it.s]} (${it.c})`);
+        return { ok: false, txt: `حصتك ${SLOT_NAME[it.s]} (${it.c}): ما تيسّر تبديل ولا تأمين للحين — الإدارة بترتّبها وتبلّغك` };
+      });
       const skipped = slots.filter(x => !own.includes(x)).map(x => SLOT_NAME[x]);
-      return { result: res, skipped };
+      return { result: res, skipped, uncovered };
     },
     // طلب تأمين حصص (غياب بعذر رسمي) من التطبيق: يسجّل المعلم غائبًا في حصصه المطلوبة ويوزّع التأمين بنفس القواعد
     absenceRequest(iso, a, slots, full) {
